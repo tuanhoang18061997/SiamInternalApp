@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../providers/auth_provider.dart';
 import '../providers/leave_request_provider.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/utils/date_formatter.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -204,9 +205,5 @@ class HomeScreen extends ConsumerWidget {
         label: const Text('New Request'),
       ),
     );
-  }
-
-  String _formatDate(DateTime date) {
-    return '${date.day}/${date.month}/${date.year}';
   }
 }

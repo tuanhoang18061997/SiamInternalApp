@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../providers/auth_provider.dart';
 import '../providers/leave_request_provider.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/utils/date_formatter.dart';
 
 class LeaveRequestDetailScreen extends ConsumerStatefulWidget {
   final String requestId;
@@ -203,12 +204,12 @@ class _LeaveRequestDetailScreenState extends ConsumerState<LeaveRequestDetailScr
                         const Divider(),
                         _buildDetailRow(
                           'Start Date',
-                          _formatDate(request.startDate),
+                          DateFormatter.formatDate(request.startDate),
                         ),
                         const Divider(),
                         _buildDetailRow(
                           'End Date',
-                          _formatDate(request.endDate),
+                          DateFormatter.formatDate(request.endDate),
                         ),
                         const Divider(),
                         _buildDetailRow(
@@ -255,7 +256,7 @@ class _LeaveRequestDetailScreenState extends ConsumerState<LeaveRequestDetailScr
                             const Divider(),
                             _buildDetailRow(
                               'Date',
-                              _formatDate(request.approvedAt!),
+                              DateFormatter.formatDate(request.approvedAt!),
                             ),
                           ],
                           if (request.rejectionReason != null) ...[
@@ -358,9 +359,5 @@ class _LeaveRequestDetailScreenState extends ConsumerState<LeaveRequestDetailScr
         ],
       ),
     );
-  }
-
-  String _formatDate(DateTime date) {
-    return '${date.day}/${date.month}/${date.year}';
   }
 }

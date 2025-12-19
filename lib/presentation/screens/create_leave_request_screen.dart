@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../providers/auth_provider.dart';
 import '../providers/leave_request_provider.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/utils/date_formatter.dart';
 
 class CreateLeaveRequestScreen extends ConsumerStatefulWidget {
   const CreateLeaveRequestScreen({super.key});
@@ -134,7 +135,7 @@ class _CreateLeaveRequestScreenState extends ConsumerState<CreateLeaveRequestScr
                     prefixIcon: Icon(Icons.calendar_today),
                   ),
                   child: Text(
-                    '${_startDate.day}/${_startDate.month}/${_startDate.year}',
+                    DateFormatter.formatDate(_startDate),
                   ),
                 ),
               ),
@@ -148,7 +149,7 @@ class _CreateLeaveRequestScreenState extends ConsumerState<CreateLeaveRequestScr
                     prefixIcon: Icon(Icons.calendar_today),
                   ),
                   child: Text(
-                    '${_endDate.day}/${_endDate.month}/${_endDate.year}',
+                    DateFormatter.formatDate(_endDate),
                   ),
                 ),
               ),
@@ -189,12 +190,8 @@ class _CreateLeaveRequestScreenState extends ConsumerState<CreateLeaveRequestScr
                       const SizedBox(height: 8),
                       Text('Leave Type: $_selectedLeaveType'),
                       Text('Duration: ${_endDate.difference(_startDate).inDays + 1} day(s)'),
-                      Text(
-                        'From: ${_startDate.day}/${_startDate.month}/${_startDate.year}',
-                      ),
-                      Text(
-                        'To: ${_endDate.day}/${_endDate.month}/${_endDate.year}',
-                      ),
+                      Text('From: ${DateFormatter.formatDate(_startDate)}'),
+                      Text('To: ${DateFormatter.formatDate(_endDate)}'),
                     ],
                   ),
                 ),

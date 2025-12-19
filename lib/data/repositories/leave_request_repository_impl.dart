@@ -11,7 +11,7 @@ class LeaveRequestRepositoryImpl implements LeaveRequestRepository {
   @override
   Future<List<LeaveRequest>> getLeaveRequests() async {
     final models = await _dataSource.getLeaveRequests();
-    return models.map((m) => m.toEntity()).toList();
+    return models.map((model) => model.toEntity()).toList();
   }
 
   @override

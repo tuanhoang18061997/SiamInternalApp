@@ -63,5 +63,6 @@ class LeaveRequestNotifier extends StateNotifier<AsyncValue<void>> {
 }
 
 final leaveRequestNotifierProvider = StateNotifierProvider<LeaveRequestNotifier, AsyncValue<void>>((ref) {
-  return LeaveRequestNotifier(ref.watch(leaveRequestRepositoryProvider) as LeaveRequestRepositoryImpl);
+  final repository = ref.watch(leaveRequestRepositoryProvider);
+  return LeaveRequestNotifier(repository as LeaveRequestRepositoryImpl);
 });
