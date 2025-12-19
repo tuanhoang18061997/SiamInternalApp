@@ -4,11 +4,9 @@ linter:
   rules:
     - always_declare_return_types
     - always_put_required_named_parameters_first
-    - always_require_non_null_named_parameters
     - avoid_empty_else
     - avoid_print
     - avoid_relative_lib_imports
-    - avoid_returning_null_for_future
     - avoid_slow_async_io
     - avoid_types_as_parameter_names
     - cancel_subscriptions
@@ -18,7 +16,6 @@ linter:
     - empty_statements
     - hash_and_equals
     - implementation_imports
-    - package_api_docs
     - package_names
     - package_prefixed_library_names
     - prefer_adjacent_string_concatenation
