@@ -27,6 +27,36 @@ class LeaveRequest {
     this.createdAt,
   });
 
+  LeaveRequest copyWith({
+    String? id,
+    String? employeeId,
+    String? employeeName,
+    String? leaveType,
+    DateTime? startDate,
+    DateTime? endDate,
+    String? reason,
+    String? status,
+    String? approvedBy,
+    DateTime? approvedAt,
+    String? rejectionReason,
+    DateTime? createdAt,
+  }) {
+    return LeaveRequest(
+      id: id ?? this.id,
+      employeeId: employeeId ?? this.employeeId,
+      employeeName: employeeName ?? this.employeeName,
+      leaveType: leaveType ?? this.leaveType,
+      startDate: startDate ?? this.startDate,
+      endDate: endDate ?? this.endDate,
+      reason: reason ?? this.reason,
+      status: status ?? this.status,
+      approvedBy: approvedBy ?? this.approvedBy,
+      approvedAt: approvedAt ?? this.approvedAt,
+      rejectionReason: rejectionReason ?? this.rejectionReason,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
   factory LeaveRequest.fromJson(Map<String, dynamic> json) => LeaveRequest(
         id: json['id'] as String,
         employeeId: json['employee_id'] as String,
@@ -60,34 +90,4 @@ class LeaveRequest {
         'rejection_reason': rejectionReason,
         'created_at': createdAt?.toIso8601String(),
       };
-
-  LeaveRequest copyWith({
-    String? id,
-    String? employeeId,
-    String? employeeName,
-    String? leaveType,
-    DateTime? startDate,
-    DateTime? endDate,
-    String? reason,
-    String? status,
-    String? approvedBy,
-    DateTime? approvedAt,
-    String? rejectionReason,
-    DateTime? createdAt,
-  }) {
-    return LeaveRequest(
-      id: id ?? this.id,
-      employeeId: employeeId ?? this.employeeId,
-      employeeName: employeeName ?? this.employeeName,
-      leaveType: leaveType ?? this.leaveType,
-      startDate: startDate ?? this.startDate,
-      endDate: endDate ?? this.endDate,
-      reason: reason ?? this.reason,
-      status: status ?? this.status,
-      approvedBy: approvedBy ?? this.approvedBy,
-      approvedAt: approvedAt ?? this.approvedAt,
-      rejectionReason: rejectionReason ?? this.rejectionReason,
-      createdAt: createdAt ?? this.createdAt,
-    );
-  }
 }
