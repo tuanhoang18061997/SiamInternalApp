@@ -44,7 +44,6 @@ lib/
 - **Routing**: go_router ^13.0.0
 - **Networking**: dio ^5.4.0
 - **Environment Variables**: flutter_dotenv ^5.1.0
-- **Code Generation**: freezed, json_serializable
 
 ## Getting Started
 
@@ -66,17 +65,12 @@ cd SiamInternalApp
 flutter pub get
 ```
 
-3. Generate code for freezed and json_serializable:
-```bash
-flutter pub run build_runner build --delete-conflicting-outputs
-```
-
-4. Create a `.env` file from the example:
+3. Create a `.env` file from the example:
 ```bash
 cp .env.example .env
 ```
 
-5. Run the app:
+4. Run the app:
 ```bash
 flutter run
 ```
@@ -115,14 +109,6 @@ The app includes mock users for testing:
 5. **Provide Feedback**: Add rejection reason when rejecting requests
 
 ## Development
-
-### Code Generation
-
-When modifying models or entities with freezed/json_serializable annotations:
-
-```bash
-flutter pub run build_runner watch
-```
 
 ### Linting
 
@@ -166,7 +152,7 @@ Copy `.env.example` to `.env` and configure:
 - Repository implementations bridging data and domain layers
 
 ### Domain Layer
-- Pure business entities using freezed for immutability
+- Pure business entities with manual serialization
 - Repository interfaces defining contracts
 - Use cases for business logic (can be added as needed)
 

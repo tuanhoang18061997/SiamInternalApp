@@ -1,9 +1,5 @@
-import 'package:json_annotation/json_annotation.dart';
 import '../../domain/entities/user.dart';
 
-part 'user_model.g.dart';
-
-@JsonSerializable()
 class UserModel {
   final String id;
   final String email;
@@ -19,10 +15,21 @@ class UserModel {
     this.department,
   });
 
-  factory UserModel.fromJson(Map<String, dynamic> json) =>
-      _$UserModelFromJson(json);
+  factory UserModel.fromJson(Map<String, dynamic> json) => UserModel(
+        id: json['id'] as String,
+        email: json['email'] as String,
+        name: json['name'] as String,
+        role: json['role'] as String,
+        department: json['department'] as String?,
+      );
 
-  Map<String, dynamic> toJson() => _$UserModelToJson(this);
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'email': email,
+        'name': name,
+        'role': role,
+        'department': department,
+      };
 
   User toEntity() => User(
         id: id,

@@ -1,30 +1,17 @@
-import 'package:json_annotation/json_annotation.dart';
 import '../../domain/entities/leave_request.dart';
 
-part 'leave_request_model.g.dart';
-
-@JsonSerializable()
 class LeaveRequestModel {
   final String id;
-  @JsonKey(name: 'employee_id')
   final String employeeId;
-  @JsonKey(name: 'employee_name')
   final String employeeName;
-  @JsonKey(name: 'leave_type')
   final String leaveType;
-  @JsonKey(name: 'start_date')
   final String startDate;
-  @JsonKey(name: 'end_date')
   final String endDate;
   final String reason;
   final String status;
-  @JsonKey(name: 'approved_by')
   final String? approvedBy;
-  @JsonKey(name: 'approved_at')
   final String? approvedAt;
-  @JsonKey(name: 'rejection_reason')
   final String? rejectionReason;
-  @JsonKey(name: 'created_at')
   final String? createdAt;
 
   LeaveRequestModel({
@@ -43,9 +30,35 @@ class LeaveRequestModel {
   });
 
   factory LeaveRequestModel.fromJson(Map<String, dynamic> json) =>
-      _$LeaveRequestModelFromJson(json);
+      LeaveRequestModel(
+        id: json['id'] as String,
+        employeeId: json['employee_id'] as String,
+        employeeName: json['employee_name'] as String,
+        leaveType: json['leave_type'] as String,
+        startDate: json['start_date'] as String,
+        endDate: json['end_date'] as String,
+        reason: json['reason'] as String,
+        status: json['status'] as String,
+        approvedBy: json['approved_by'] as String?,
+        approvedAt: json['approved_at'] as String?,
+        rejectionReason: json['rejection_reason'] as String?,
+        createdAt: json['created_at'] as String?,
+      );
 
-  Map<String, dynamic> toJson() => _$LeaveRequestModelToJson(this);
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'employee_id': employeeId,
+        'employee_name': employeeName,
+        'leave_type': leaveType,
+        'start_date': startDate,
+        'end_date': endDate,
+        'reason': reason,
+        'status': status,
+        'approved_by': approvedBy,
+        'approved_at': approvedAt,
+        'rejection_reason': rejectionReason,
+        'created_at': createdAt,
+      };
 
   LeaveRequest toEntity() => LeaveRequest(
         id: id,
