@@ -1,362 +1,307 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../providers/auth_provider.dart';
-import '../providers/leave_request_provider.dart';
-import '../../core/constants/app_constants.dart';
-import '../../core/utils/date_formatter.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
-class LeaveRequestDetailScreen extends ConsumerStatefulWidget {
+class LeaveRequestDetailScreen extends StatefulWidget {
   final String requestId;
-
-  const LeaveRequestDetailScreen({
-    super.key,
-    required this.requestId,
-  });
+  const LeaveRequestDetailScreen({super.key, required this.requestId});
 
   @override
-  ConsumerState<LeaveRequestDetailScreen> createState() => _LeaveRequestDetailScreenState();
+  State<LeaveRequestDetailScreen> createState() =>
+      _LeaveRequestDetailScreenState();
 }
 
-class _LeaveRequestDetailScreenState extends ConsumerState<LeaveRequestDetailScreen> {
-  bool _isProcessing = false;
+class _LeaveRequestDetailScreenState extends State<LeaveRequestDetailScreen> {
+  Map<String, dynamic>? request;
+  bool loading = true;
+  String? error;
+  int groupId = 0; // role hiện tại lấy từ API
 
-  Future<void> _handleApprove() async {
-    final user = ref.read(currentUserProvider);
-    if (user == null) return;
+  static const String baseUrl = "http://localhost:5204";
 
-    setState(() => _isProcessing = true);
+  @override
+  void initState() {
+    super.initState();
+    _loadDetail();
+  }
 
+  Future<void> _callAction(String action) async {
     try {
-      await ref.read(leaveRequestNotifierProvider.notifier).approveLeaveRequest(
-            widget.requestId,
-            user.name,
-          );
-
-      if (mounted) {
-        ref.invalidate(leaveRequestsProvider);
-        ref.invalidate(leaveRequestDetailProvider(widget.requestId));
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString("token");
+      if (token == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Leave request approved'),
-            backgroundColor: Colors.green,
-          ),
+              content: Text("No token found"), backgroundColor: Colors.red),
+        );
+        return;
+      }
+
+      final uri = Uri.parse("$baseUrl/api/Letters/${widget.requestId}/$action");
+      final res = await http.put(uri, headers: {
+        "Authorization": "Bearer $token",
+        "Content-Type": "application/json"
+      });
+
+      if (res.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text("$action success"), backgroundColor: Colors.green),
+        );
+        _loadDetail(); // reload để cập nhật trạng thái
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text("Failed: ${res.statusCode}"),
+              backgroundColor: Colors.red),
         );
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to approve: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isProcessing = false);
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
+      );
     }
   }
 
-  Future<void> _handleReject() async {
-    final user = ref.read(currentUserProvider);
-    if (user == null) return;
-
-    final reasonController = TextEditingController();
-
-    final reason = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Reject Leave Request'),
-        content: TextField(
-          controller: reasonController,
-          decoration: const InputDecoration(
-            labelText: 'Rejection Reason',
-            border: OutlineInputBorder(),
-          ),
-          maxLines: 3,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context, reasonController.text);
-            },
-            child: const Text('Reject'),
-          ),
-        ],
-      ),
-    );
-
-    if (reason == null || reason.isEmpty) return;
-
-    setState(() => _isProcessing = true);
+  Future<void> _loadDetail() async {
+    setState(() {
+      loading = true;
+      error = null;
+    });
 
     try {
-      await ref.read(leaveRequestNotifierProvider.notifier).rejectLeaveRequest(
-            widget.requestId,
-            user.name,
-            reason,
-          );
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString("token");
+      if (token == null) {
+        setState(() => error = "No token found");
+        return;
+      }
 
-      if (mounted) {
-        ref.invalidate(leaveRequestsProvider);
-        ref.invalidate(leaveRequestDetailProvider(widget.requestId));
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Leave request rejected'),
-            backgroundColor: Colors.orange,
-          ),
-        );
+      final uri = Uri.parse("$baseUrl/api/Letters/${widget.requestId}");
+      final res =
+          await http.get(uri, headers: {"Authorization": "Bearer $token"});
+
+      if (res.statusCode == 200) {
+        final body = jsonDecode(res.body);
+        setState(() {
+          request = body;
+          groupId = body['currentUserGroupId'] ?? 0; // lấy role từ API
+          print("statusId: ${request?['statusId']}, groupId: $groupId");
+        });
+      } else {
+        setState(() => error = "Failed: ${res.statusCode}");
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to reject: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      setState(() => error = e.toString());
     } finally {
-      if (mounted) {
-        setState(() => _isProcessing = false);
-      }
+      setState(() => loading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final requestAsync = ref.watch(leaveRequestDetailProvider(widget.requestId));
-    final user = ref.watch(currentUserProvider);
-    final isManager = user?.role == 'manager';
+    final statusColor = () {
+      final statusId = request?['statusId'];
+      switch (statusId) {
+        case 3:
+          return Colors.green; // approved
+        case 4:
+          return Colors.red; // rejected
+        case 2:
+          return Colors.grey; // canceled
+        default:
+          return Colors.orange; // pending
+      }
+    }();
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Leave Request Details'),
-      ),
-      body: requestAsync.when(
-        data: (request) {
-          final statusColor = request.status == AppConstants.statusApproved
-              ? Colors.green
-              : request.status == AppConstants.statusRejected
-                  ? Colors.red
-                  : Colors.orange;
-
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text(
-                              'Status',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 8,
-                              ),
-                              decoration: BoxDecoration(
-                                color: statusColor.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                request.status.toUpperCase(),
-                                style: TextStyle(
-                                  color: statusColor,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildDetailRow('Employee', request.employeeName),
-                        const Divider(),
-                        _buildDetailRow('Leave Type', request.leaveType),
-                        const Divider(),
-                        _buildDetailRow(
-                          'Start Date',
-                          DateFormatter.formatDate(request.startDate),
-                        ),
-                        const Divider(),
-                        _buildDetailRow(
-                          'End Date',
-                          DateFormatter.formatDate(request.endDate),
-                        ),
-                        const Divider(),
-                        _buildDetailRow(
-                          'Duration',
-                          '${request.endDate.difference(request.startDate).inDays + 1} day(s)',
-                        ),
-                        const Divider(),
-                        const Text(
-                          'Reason',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(request.reason),
-                      ],
-                    ),
-                  ),
-                ),
-                if (request.approvedBy != null) ...[
-                  const SizedBox(height: 16),
-                  Card(
-                    child: Padding(
+      appBar: AppBar(title: const Text('Leave Request Detail')),
+      body: loading
+          ? const Center(child: CircularProgressIndicator())
+          : error != null
+              ? Center(child: Text("Lỗi: $error"))
+              : request == null
+                  ? const Center(child: Text("Không có dữ liệu"))
+                  : SingleChildScrollView(
                       padding: const EdgeInsets.all(16),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Approval Information',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
+                          Card(
+                            elevation: 3,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                          ),
-                          const SizedBox(height: 12),
-                          _buildDetailRow(
-                            request.status == AppConstants.statusApproved
-                                ? 'Approved By'
-                                : 'Rejected By',
-                            request.approvedBy!,
-                          ),
-                          if (request.approvedAt != null) ...[
-                            const Divider(),
-                            _buildDetailRow(
-                              'Date',
-                              DateFormatter.formatDate(request.approvedAt!),
-                            ),
-                          ],
-                          if (request.rejectionReason != null) ...[
-                            const Divider(),
-                            const Text(
-                              'Rejection Reason',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _buildRow(Icons.confirmation_number, "Code",
+                                      request!['code']),
+                                  _buildRow(Icons.person, "Employee",
+                                      request!['creatorName']),
+                                  _buildRow(Icons.work, "Leave Type",
+                                      request!['dayOffTypeName']),
+                                  _buildRow(Icons.access_time, "Off Type",
+                                      _mapOffType(request!['offTypeId'])),
+                                  _buildRow(Icons.calendar_today, "Start Date",
+                                      _formatDate(request!['fromDate'])),
+                                  _buildRow(Icons.calendar_today, "End Date",
+                                      _formatDate(request!['toDate'])),
+                                  _buildRow(Icons.notes, "Reason",
+                                      request!['reason']),
+                                  const SizedBox(height: 12),
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: statusColor.withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      "Status: ${_mapStatus(request!['statusId']).toUpperCase()}",
+                                      style: TextStyle(
+                                        color: statusColor,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                            const SizedBox(height: 8),
-                            Text(request.rejectionReason!),
-                          ],
+                          ),
+                          const SizedBox(height: 24),
+                          // Chỉ hiện nút nếu pending và role là manager
+                          if (request!['statusId'] == 1 &&
+                              (groupId == 1 || groupId == 2))
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: ElevatedButton(
+                                    onPressed: () {
+                                      _callAction("approve");
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.green,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      elevation: 4,
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 16),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: const [
+                                        Icon(Icons.check, color: Colors.white),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          'Approve',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: ElevatedButton(
+                                    onPressed: () {
+                                      _callAction("reject");
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.red,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      elevation: 4,
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 16),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: const [
+                                        Icon(Icons.close, color: Colors.white),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          'Reject',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            )
                         ],
                       ),
                     ),
-                  ),
-                ],
-                if (isManager && request.status == AppConstants.statusPending) ...[
-                  const SizedBox(height: 24),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: _isProcessing ? null : _handleApprove,
-                          icon: const Icon(Icons.check),
-                          label: const Text('Approve'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: _isProcessing ? null : _handleReject,
-                          icon: const Icon(Icons.close),
-                          label: const Text('Reject'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ],
-            ),
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stack) => Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error, size: 64, color: Colors.red),
-              const SizedBox(height: 16),
-              Text('Error: $error'),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () {
-                  ref.invalidate(leaveRequestDetailProvider(widget.requestId));
-                },
-                child: const Text('Retry'),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 
-  Widget _buildDetailRow(String label, String value) {
+  Widget _buildRow(IconData icon, String label, dynamic value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 120,
-            child: Text(
-              label,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+          Icon(icon, color: Colors.blueGrey, size: 20),
+          const SizedBox(width: 8),
+          Text(
+            "$label: ",
+            style: const TextStyle(fontWeight: FontWeight.bold),
           ),
           Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(fontSize: 14),
-            ),
+            child: Text(value?.toString() ?? "",
+                style: const TextStyle(color: Colors.black87)),
           ),
         ],
       ),
     );
+  }
+
+  String _mapStatus(dynamic statusId) {
+    switch (statusId) {
+      case 1:
+        return 'pending';
+      case 2:
+        return 'canceled';
+      case 3:
+        return 'approved';
+      case 4:
+        return 'rejected';
+      default:
+        return 'pending';
+    }
+  }
+
+  String _mapOffType(dynamic offTypeId) {
+    switch (offTypeId) {
+      case 1:
+        return "Buổi sáng";
+      case 2:
+        return "Buổi chiều";
+      case 3:
+        return "Cả ngày";
+      default:
+        return "Không xác định";
+    }
+  }
+
+  String _formatDate(dynamic dateStr) {
+    if (dateStr == null) return "";
+    final d = DateTime.tryParse(dateStr.toString());
+    if (d == null) return dateStr.toString();
+    return "${d.day}/${d.month}/${d.year}";
   }
 }

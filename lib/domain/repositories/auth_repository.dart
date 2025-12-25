@@ -1,7 +1,7 @@
-import '../../domain/entities/user.dart';
+import '../entities/login_response.dart';
 
 abstract class AuthRepository {
-  Future<User> login(String email, String password);
+  Future<LoginResponse?> login(String username, String password);
   Future<void> logout();
-  Future<User?> getCurrentUser();
+  Future<LoginResponse?> getCurrentUser();
 }

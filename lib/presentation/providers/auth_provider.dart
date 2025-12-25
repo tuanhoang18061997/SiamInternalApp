@@ -1,36 +1,61 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:state_notifier/state_notifier.dart';
-import '../../domain/entities/user.dart';
+import '../../domain/entities/login_response.dart';
+import '../../domain/repositories/auth_repository.dart';
+import '../../data/datasources/auth_remote_datasource.dart';
 import '../../data/repositories/auth_repository_impl.dart';
+import '../../core/network/dio_client.dart';
 
-class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
-  final AuthRepositoryImpl _repository;
+final authTokenProvider = StateProvider<String?>((ref) => null);
 
-  AuthNotifier(this._repository) : super(const AsyncValue.data(null));
+class AuthNotifier extends StateNotifier<AsyncValue<LoginResponse?>> {
+  final AuthRepository _repository;
+  final Ref _ref;
 
-  Future<void> login(String email, String password) async {
+  AuthNotifier(this._repository, this._ref)
+      : super(const AsyncValue.data(null));
+
+  Future<void> login(String username, String password) async {
     state = const AsyncValue.loading();
     try {
-      final user = await _repository.login(email, password);
-      state = AsyncValue.data(user);
+      final response = await _repository.login(username, password);
+
+      if (response != null) {
+        _ref.read(authTokenProvider.notifier).state = response.token;
+        state = AsyncValue.data(response);
+      } else {
+        // Sai tài khoản hoặc mật khẩu → chỉ set error string
+        state = AsyncValue.error(
+          "Sai tài khoản hoặc mật khẩu",
+          StackTrace.current,
+        );
+      }
     } catch (e, stack) {
-      state = AsyncValue.error(e, stack);
+      // Lỗi khác (network, server)
+      state = AsyncValue.error(e.toString(), stack);
     }
   }
 
   Future<void> logout() async {
     await _repository.logout();
+    _ref.read(authTokenProvider.notifier).state = null;
     state = const AsyncValue.data(null);
   }
 
-  User? get currentUser => state.value;
+  LoginResponse? get currentUser => state.value;
 }
 
-final authProvider = StateNotifierProvider<AuthNotifier, AsyncValue<User?>>((ref) {
-  final repository = ref.watch(authRepositoryProvider);
-  return AuthNotifier(repository as AuthRepositoryImpl);
+final authRepositoryProvider = Provider<AuthRepository>((ref) {
+  final dio = ref.watch(dioProvider);
+  final remote = AuthRemoteDataSource(dio);
+  return AuthRepositoryImpl(remote);
 });
 
-final currentUserProvider = Provider<User?>((ref) {
+final authProvider =
+    StateNotifierProvider<AuthNotifier, AsyncValue<LoginResponse?>>((ref) {
+  final repository = ref.watch(authRepositoryProvider);
+  return AuthNotifier(repository, ref);
+});
+
+final currentUserProvider = Provider<LoginResponse?>((ref) {
   return ref.watch(authProvider).value;
 });

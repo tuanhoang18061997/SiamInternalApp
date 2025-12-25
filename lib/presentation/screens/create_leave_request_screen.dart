@@ -1,47 +1,71 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-import '../providers/auth_provider.dart';
-import '../providers/leave_request_provider.dart';
-import '../../core/constants/app_constants.dart';
-import '../../core/utils/date_formatter.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
-class CreateLeaveRequestScreen extends ConsumerStatefulWidget {
+class CreateLeaveRequestScreen extends StatefulWidget {
   const CreateLeaveRequestScreen({super.key});
 
   @override
-  ConsumerState<CreateLeaveRequestScreen> createState() => _CreateLeaveRequestScreenState();
+  State<CreateLeaveRequestScreen> createState() =>
+      _CreateLeaveRequestScreenState();
 }
 
-class _CreateLeaveRequestScreenState extends ConsumerState<CreateLeaveRequestScreen> {
+class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
   final _formKey = GlobalKey<FormState>();
   final _reasonController = TextEditingController();
-  
-  String _selectedLeaveType = AppConstants.leaveTypes.first;
-  DateTime _startDate = DateTime.now().add(const Duration(days: 1));
-  DateTime _endDate = DateTime.now().add(const Duration(days: 1));
-  bool _isLoading = false;
+  final _replaceController = TextEditingController();
+
+  String _selectedOffType = 'Full Day';
+  int? _selectedDayOffTypeId;
+  DateTime _startDate = DateTime.now();
+  DateTime _endDate = DateTime.now();
+  bool _submitting = false;
+  List<Map<String, dynamic>> _dayOffTypes = [];
+
+  static const String baseUrl = "http://localhost:5204";
 
   @override
-  void dispose() {
-    _reasonController.dispose();
-    super.dispose();
+  void initState() {
+    super.initState();
+    _loadDayOffTypes();
   }
 
-  Future<void> _selectDate(BuildContext context, bool isStartDate) async {
-    final DateTime? picked = await showDatePicker(
+  Future<void> _loadDayOffTypes() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString("token");
+      if (token == null) return;
+
+      final uri = Uri.parse("$baseUrl/api/Letters/dayofftypes");
+      final res =
+          await http.get(uri, headers: {"Authorization": "Bearer $token"});
+      if (res.statusCode == 200) {
+        final List data = jsonDecode(res.body);
+        setState(() {
+          _dayOffTypes = data.cast<Map<String, dynamic>>();
+          if (_dayOffTypes.isNotEmpty) {
+            _selectedDayOffTypeId = _dayOffTypes.first["id"];
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint("Error loading dayofftypes: $e");
+    }
+  }
+
+  Future<void> _pickDate({required bool isStart}) async {
+    final picked = await showDatePicker(
       context: context,
-      initialDate: isStartDate ? _startDate : _endDate,
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      initialDate: isStart ? _startDate : _endDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
     );
     if (picked != null) {
       setState(() {
-        if (isStartDate) {
+        if (isStart) {
           _startDate = picked;
-          if (_endDate.isBefore(_startDate)) {
-            _endDate = _startDate;
-          }
+          if (_endDate.isBefore(_startDate)) _endDate = _startDate;
         } else {
           _endDate = picked;
         }
@@ -49,168 +73,199 @@ class _CreateLeaveRequestScreenState extends ConsumerState<CreateLeaveRequestScr
     }
   }
 
-  Future<void> _handleSubmit() async {
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_selectedDayOffTypeId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text("Please select Day Off Type"),
+            backgroundColor: Colors.red),
+      );
+      return;
+    }
 
-    final user = ref.read(currentUserProvider);
-    if (user == null) return;
-
-    setState(() => _isLoading = true);
+    setState(() => _submitting = true);
 
     try {
-      await ref.read(leaveRequestNotifierProvider.notifier).createLeaveRequest(
-            employeeId: user.id,
-            employeeName: user.name,
-            leaveType: _selectedLeaveType,
-            startDate: _startDate,
-            endDate: _endDate,
-            reason: _reasonController.text,
-          );
-
-      if (mounted) {
-        ref.invalidate(leaveRequestsProvider);
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString("token");
+      if (token == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Leave request created successfully'),
-            backgroundColor: Colors.green,
-          ),
+              content: Text("No token found"), backgroundColor: Colors.red),
         );
-        context.pop();
+        return;
       }
-    } catch (e) {
-      if (mounted) {
+
+      // Map offTypeId: Full Day=3, Afternoon=2, Morning=1
+      final offTypeId = switch (_selectedOffType) {
+        'Full Day' => 3,
+        'Afternoon' => 2,
+        'Morning' => 1,
+        _ => 3,
+      };
+
+      final body = {
+        "fromDate": _startDate.toIso8601String(),
+        "toDate": _endDate.toIso8601String(),
+        "dayOffTypeId": _selectedDayOffTypeId,
+        "offTypeId": offTypeId,
+        "reason": _reasonController.text,
+        "replacePerson": _replaceController.text
+      };
+
+      final uri = Uri.parse("$baseUrl/api/Letters");
+      final res = await http.post(uri,
+          headers: {
+            "Authorization": "Bearer $token",
+            "Content-Type": "application/json"
+          },
+          body: jsonEncode(body));
+
+      if (res.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text("Request submitted successfully"),
+              backgroundColor: Colors.green),
+        );
+        Navigator.pop(context);
+      } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to create leave request: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
+              content: Text("Failed: ${res.statusCode}"),
+              backgroundColor: Colors.red),
         );
       }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
+      );
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      setState(() => _submitting = false);
     }
   }
+
+  String _formatDate(DateTime d) => "${d.day}/${d.month}/${d.year}";
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('New Leave Request'),
-      ),
+      appBar: AppBar(title: const Text('New Leave Request')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              DropdownButtonFormField<String>(
-                value: _selectedLeaveType,
-                decoration: const InputDecoration(
-                  labelText: 'Leave Type',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.category),
-                ),
-                items: AppConstants.leaveTypes.map((type) {
-                  return DropdownMenuItem(
-                    value: type,
-                    child: Text(type),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  if (value != null) {
-                    setState(() => _selectedLeaveType = value);
-                  }
-                },
-              ),
-              const SizedBox(height: 16),
-              InkWell(
-                onTap: () => _selectDate(context, true),
-                child: InputDecorator(
-                  decoration: const InputDecoration(
-                    labelText: 'Start Date',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.calendar_today),
+        child: Card(
+          elevation: 6,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                children: [
+                  // OffType
+                  DropdownButtonFormField<String>(
+                    value: _selectedOffType,
+                    items: ['Full Day', 'Morning', 'Afternoon']
+                        .map((type) =>
+                            DropdownMenuItem(value: type, child: Text(type)))
+                        .toList(),
+                    onChanged: (val) => setState(() => _selectedOffType = val!),
+                    decoration: const InputDecoration(
+                      labelText: 'Off Type',
+                      border: OutlineInputBorder(),
+                    ),
                   ),
-                  child: Text(
-                    DateFormatter.formatDate(_startDate),
+                  const SizedBox(height: 16),
+
+                  // DayOffType
+                  DropdownButtonFormField<int>(
+                    value: _selectedDayOffTypeId,
+                    items: _dayOffTypes.map((type) {
+                      return DropdownMenuItem<int>(
+                        value: type["id"],
+                        child: Text(type["name"]),
+                      );
+                    }).toList(),
+                    onChanged: (val) =>
+                        setState(() => _selectedDayOffTypeId = val),
+                    decoration: const InputDecoration(
+                      labelText: 'Day Off Type',
+                      border: OutlineInputBorder(),
+                    ),
                   ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              InkWell(
-                onTap: () => _selectDate(context, false),
-                child: InputDecorator(
-                  decoration: const InputDecoration(
-                    labelText: 'End Date',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.calendar_today),
-                  ),
-                  child: Text(
-                    DateFormatter.formatDate(_endDate),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _reasonController,
-                decoration: const InputDecoration(
-                  labelText: 'Reason',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.notes),
-                ),
-                maxLines: 5,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a reason';
-                  }
-                  if (value.length < 10) {
-                    return 'Reason must be at least 10 characters';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 24),
-              Card(
-                color: Colors.blue[50],
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  const SizedBox(height: 16),
+
+                  // Start / End
+                  Row(
                     children: [
-                      const Text(
-                        'Summary',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
+                      Expanded(
+                        child: ListTile(
+                          title: Text("Start: ${_formatDate(_startDate)}"),
+                          trailing: const Icon(Icons.calendar_today),
+                          onTap: () => _pickDate(isStart: true),
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      Text('Leave Type: $_selectedLeaveType'),
-                      Text('Duration: ${_endDate.difference(_startDate).inDays + 1} day(s)'),
-                      Text('From: ${DateFormatter.formatDate(_startDate)}'),
-                      Text('To: ${DateFormatter.formatDate(_endDate)}'),
+                      Expanded(
+                        child: ListTile(
+                          title: Text("End: ${_formatDate(_endDate)}"),
+                          trailing: const Icon(Icons.calendar_today),
+                          onTap: () => _pickDate(isStart: false),
+                        ),
+                      ),
                     ],
                   ),
-                ),
+                  const SizedBox(height: 16),
+
+                  // Reason
+                  TextFormField(
+                    controller: _reasonController,
+                    decoration: const InputDecoration(
+                      labelText: 'Reason',
+                      border: OutlineInputBorder(),
+                    ),
+                    maxLines: 3,
+                    validator: (v) =>
+                        v == null || v.isEmpty ? "Please enter reason" : null,
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Replace Person
+                  TextFormField(
+                    controller: _replaceController,
+                    decoration: const InputDecoration(
+                      labelText: 'Replace Person (optional)',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Submit button
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _submitting ? null : _submit,
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 18),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                        backgroundColor: Colors.blue,
+                        elevation: 5,
+                      ),
+                      child: _submitting
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : const Text(
+                              "SUBMIT REQUEST",
+                              style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white),
+                            ),
+                    ),
+                  )
+                ],
               ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: _isLoading ? null : _handleSubmit,
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-                child: _isLoading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('Submit Request'),
-              ),
-            ],
+            ),
           ),
         ),
       ),

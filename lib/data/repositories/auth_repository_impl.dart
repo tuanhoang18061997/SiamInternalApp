@@ -1,33 +1,24 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../domain/entities/user.dart';
+import '../../domain/entities/login_response.dart';
 import '../../domain/repositories/auth_repository.dart';
-import '../datasources/mock_api_datasource.dart';
+import '../datasources/auth_remote_datasource.dart';
 
 class AuthRepositoryImpl implements AuthRepository {
-  final MockApiDataSource _dataSource;
-
-  AuthRepositoryImpl(this._dataSource);
-
-  User? _currentUser;
+  final AuthRemoteDataSource remote;
+  AuthRepositoryImpl(this.remote);
 
   @override
-  Future<User> login(String email, String password) async {
-    final userModel = await _dataSource.login(email, password);
-    _currentUser = userModel.toEntity();
-    return _currentUser!;
+  Future<LoginResponse?> login(String username, String password) async {
+    final model = await remote.login(username, password);
+    return model?.toEntity(); // nếu sai thì null
   }
 
   @override
   Future<void> logout() async {
-    _currentUser = null;
+    // Xoá token local nếu cần
   }
 
   @override
-  Future<User?> getCurrentUser() async {
-    return _currentUser;
+  Future<LoginResponse?> getCurrentUser() async {
+    return null;
   }
 }
-
-final authRepositoryProvider = Provider<AuthRepository>((ref) {
-  return AuthRepositoryImpl(ref.watch(mockApiDataSourceProvider));
-});
