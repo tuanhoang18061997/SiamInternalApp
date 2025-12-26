@@ -5,10 +5,10 @@ import 'routes/app_router.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Load environment variables
-  await dotenv.load(fileName: ".env");
-  
+  await dotenv.load(fileName: '.env');
+
   runApp(
     const ProviderScope(
       child: MyApp(),
@@ -22,7 +22,7 @@ class MyApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(appRouterProvider);
-    
+
     return MaterialApp.router(
       title: 'Siam Internal App',
       theme: ThemeData(

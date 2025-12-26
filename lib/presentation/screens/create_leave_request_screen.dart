@@ -149,21 +149,48 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
-      appBar: AppBar(title: const Text('New Leave Request')),
+      appBar: AppBar(
+        title: const Text(
+          'New Leave Request',
+          style: TextStyle(
+            color: Colors.white,
+          ),
+        ),
+        backgroundColor: Colors.indigo,
+        elevation: 3,
+        foregroundColor: Colors.white,
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Card(
           elevation: 6,
           shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           child: Padding(
             padding: const EdgeInsets.all(20),
             child: Form(
               key: _formKey,
               child: Column(
                 children: [
-                  // OffType
+                  // Header
+                  Row(
+                    children: [
+                      const Icon(Icons.event_note, color: Colors.indigo),
+                      const SizedBox(width: 8),
+                      Text(
+                        "Leave details",
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  //OffType drop
                   DropdownButtonFormField<String>(
                     value: _selectedOffType,
                     items: ['Full Day', 'Morning', 'Afternoon']
@@ -173,69 +200,106 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
                     onChanged: (val) => setState(() => _selectedOffType = val!),
                     decoration: const InputDecoration(
                       labelText: 'Off Type',
-                      border: OutlineInputBorder(),
+                      prefixIcon:
+                          const Icon(Icons.access_time, color: Colors.indigo),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.all(Radius.circular(12))),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
 
-                  // DayOffType
-                  DropdownButtonFormField<int>(
-                    value: _selectedDayOffTypeId,
-                    items: _dayOffTypes.map((type) {
-                      return DropdownMenuItem<int>(
-                        value: type["id"],
-                        child: Text(type["name"]),
-                      );
-                    }).toList(),
-                    onChanged: (val) =>
-                        setState(() => _selectedDayOffTypeId = val),
-                    decoration: const InputDecoration(
-                      labelText: 'Day Off Type',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
+                  // DayOffType dropdown
+                  _dayOffTypes.isEmpty
+                      ? const LinearProgressIndicator(minHeight: 4)
+                      : DropdownButtonFormField<int>(
+                          value: _selectedDayOffTypeId,
+                          items: _dayOffTypes.map((type) {
+                            return DropdownMenuItem<int>(
+                              value: type["id"],
+                              child: Text(type["name"]),
+                            );
+                          }).toList(),
+                          onChanged: (val) =>
+                              setState(() => _selectedDayOffTypeId = val),
+                          decoration: InputDecoration(
+                            labelText: 'Day off type',
+                            prefixIcon: const Icon(Icons.work_outline,
+                                color: Colors.indigo),
+                            border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                          ),
+                          validator: (v) =>
+                              v == null ? "Please select day off type" : null,
+                        ),
+                  const SizedBox(height: 20),
 
-                  // Start / End
+                  // Start / End date
                   Row(
                     children: [
                       Expanded(
-                        child: ListTile(
-                          title: Text("Start: ${_formatDate(_startDate)}"),
-                          trailing: const Icon(Icons.calendar_today),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(12),
                           onTap: () => _pickDate(isStart: true),
+                          child: InputDecorator(
+                            decoration: InputDecoration(
+                              labelText: 'Start date',
+                              prefixIcon: const Icon(Icons.calendar_today,
+                                  color: Colors.indigo),
+                              border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12)),
+                            ),
+                            child: Text(_formatDate(_startDate)),
+                          ),
                         ),
                       ),
+                      const SizedBox(width: 12),
                       Expanded(
-                        child: ListTile(
-                          title: Text("End: ${_formatDate(_endDate)}"),
-                          trailing: const Icon(Icons.calendar_today),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(12),
                           onTap: () => _pickDate(isStart: false),
+                          child: InputDecorator(
+                            decoration: InputDecoration(
+                              labelText: 'End date',
+                              prefixIcon: const Icon(Icons.calendar_today,
+                                  color: Colors.indigo),
+                              border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12)),
+                            ),
+                            child: Text(_formatDate(_endDate)),
+                          ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
 
                   // Reason
                   TextFormField(
                     controller: _reasonController,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Reason',
-                      border: OutlineInputBorder(),
+                      hintText: 'Ví dụ: Khám bệnh',
+                      prefixIcon: const Icon(Icons.notes, color: Colors.indigo),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12)),
                     ),
                     maxLines: 3,
-                    validator: (v) =>
-                        v == null || v.isEmpty ? "Please enter reason" : null,
+                    validator: (v) => v == null || v.trim().isEmpty
+                        ? "Please enter reason"
+                        : null,
                   ),
                   const SizedBox(height: 16),
 
                   // Replace Person
                   TextFormField(
                     controller: _replaceController,
-                    decoration: const InputDecoration(
-                      labelText: 'Replace Person (optional)',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: 'Replace person (optional)',
+                      hintText: 'Tên người thay thế',
+                      prefixIcon: const Icon(Icons.person_outline,
+                          color: Colors.indigo),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12)),
                     ),
                   ),
                   const SizedBox(height: 24),
@@ -243,26 +307,32 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
                   // Submit button
                   SizedBox(
                     width: double.infinity,
-                    child: ElevatedButton(
+                    child: ElevatedButton.icon(
                       onPressed: _submitting ? null : _submit,
+                      icon: _submitting
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white),
+                            )
+                          : const Icon(Icons.send),
+                      label: Text(
+                        _submitting ? "Submitting..." : "Submit request",
+                        style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white),
+                      ),
                       style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 18),
+                        backgroundColor: Colors.indigo,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12)),
-                        backgroundColor: Colors.blue,
                         elevation: 5,
                       ),
-                      child: _submitting
-                          ? const CircularProgressIndicator(color: Colors.white)
-                          : const Text(
-                              "SUBMIT REQUEST",
-                              style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white),
-                            ),
                     ),
-                  )
+                  ),
                 ],
               ),
             ),
