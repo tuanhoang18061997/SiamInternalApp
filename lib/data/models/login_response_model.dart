@@ -1,11 +1,6 @@
 import '../../domain/entities/login_response.dart';
 
 class LoginResponseModel {
-  final String token;
-  final String displayName;
-  final String role;
-  final int employeeId;
-
   LoginResponseModel({
     required this.token,
     required this.displayName,
@@ -21,6 +16,10 @@ class LoginResponseModel {
       employeeId: json['employeeId'],
     );
   }
+  final String token;
+  final String displayName;
+  final String role;
+  final int employeeId;
 
   LoginResponse toEntity() => LoginResponse(
         token: token,

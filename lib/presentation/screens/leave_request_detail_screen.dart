@@ -4,8 +4,8 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class LeaveRequestDetailScreen extends StatefulWidget {
-  final String requestId;
   const LeaveRequestDetailScreen({super.key, required this.requestId});
+  final String requestId;
 
   @override
   State<LeaveRequestDetailScreen> createState() =>
@@ -18,7 +18,7 @@ class _LeaveRequestDetailScreenState extends State<LeaveRequestDetailScreen> {
   String? error;
   int groupId = 0; // role hiện tại lấy từ API
 
-  static const String baseUrl = "http://localhost:5204";
+  static const String baseUrl = 'http://localhost:5204';
 
   @override
   void initState() {
@@ -29,37 +29,37 @@ class _LeaveRequestDetailScreenState extends State<LeaveRequestDetailScreen> {
   Future<void> _callAction(String action) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString("token");
+      final token = prefs.getString('token');
       if (token == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text("No token found"), backgroundColor: Colors.red),
+              content: Text('No token found'), backgroundColor: Colors.red),
         );
         return;
       }
 
-      final uri = Uri.parse("$baseUrl/api/Letters/${widget.requestId}/$action");
+      final uri = Uri.parse('$baseUrl/api/Letters/${widget.requestId}/$action');
       final res = await http.put(uri, headers: {
-        "Authorization": "Bearer $token",
-        "Content-Type": "application/json"
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json'
       });
 
       if (res.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text("$action success"), backgroundColor: Colors.green),
+              content: Text('$action success'), backgroundColor: Colors.green),
         );
         _loadDetail(); // reload để cập nhật trạng thái
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text("Failed: ${res.statusCode}"),
+              content: Text('Failed: ${res.statusCode}'),
               backgroundColor: Colors.red),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
       );
     }
   }
@@ -72,15 +72,15 @@ class _LeaveRequestDetailScreenState extends State<LeaveRequestDetailScreen> {
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString("token");
+      final token = prefs.getString('token');
       if (token == null) {
-        setState(() => error = "No token found");
+        setState(() => error = 'No token found');
         return;
       }
 
-      final uri = Uri.parse("$baseUrl/api/Letters/${widget.requestId}");
+      final uri = Uri.parse('$baseUrl/api/Letters/${widget.requestId}');
       final res =
-          await http.get(uri, headers: {"Authorization": "Bearer $token"});
+          await http.get(uri, headers: {'Authorization': 'Bearer $token'});
 
       if (res.statusCode == 200) {
         final body = jsonDecode(res.body);
@@ -90,7 +90,7 @@ class _LeaveRequestDetailScreenState extends State<LeaveRequestDetailScreen> {
           print("statusId: ${request?['statusId']}, groupId: $groupId");
         });
       } else {
-        setState(() => error = "Failed: ${res.statusCode}");
+        setState(() => error = 'Failed: ${res.statusCode}');
       }
     } catch (e) {
       setState(() => error = e.toString());
@@ -120,9 +120,9 @@ class _LeaveRequestDetailScreenState extends State<LeaveRequestDetailScreen> {
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : error != null
-              ? Center(child: Text("Lỗi: $error"))
+              ? Center(child: Text('Lỗi: $error'))
               : request == null
-                  ? const Center(child: Text("Không có dữ liệu"))
+                  ? const Center(child: Text('Không có dữ liệu'))
                   : SingleChildScrollView(
                       padding: const EdgeInsets.all(16),
                       child: Column(
@@ -138,19 +138,19 @@ class _LeaveRequestDetailScreenState extends State<LeaveRequestDetailScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  _buildRow(Icons.confirmation_number, "Code",
+                                  _buildRow(Icons.confirmation_number, 'Code',
                                       request!['code']),
-                                  _buildRow(Icons.person, "Employee",
+                                  _buildRow(Icons.person, 'Employee',
                                       request!['creatorName']),
-                                  _buildRow(Icons.work, "Leave Type",
+                                  _buildRow(Icons.work, 'Leave Type',
                                       request!['dayOffTypeName']),
-                                  _buildRow(Icons.access_time, "Off Type",
+                                  _buildRow(Icons.access_time, 'Off Type',
                                       _mapOffType(request!['offTypeId'])),
-                                  _buildRow(Icons.calendar_today, "Start Date",
+                                  _buildRow(Icons.calendar_today, 'Start Date',
                                       _formatDate(request!['fromDate'])),
-                                  _buildRow(Icons.calendar_today, "End Date",
+                                  _buildRow(Icons.calendar_today, 'End Date',
                                       _formatDate(request!['toDate'])),
-                                  _buildRow(Icons.notes, "Reason",
+                                  _buildRow(Icons.notes, 'Reason',
                                       request!['reason']),
                                   const SizedBox(height: 12),
                                   Container(
@@ -180,7 +180,7 @@ class _LeaveRequestDetailScreenState extends State<LeaveRequestDetailScreen> {
                                 Expanded(
                                   child: ElevatedButton(
                                     onPressed: () {
-                                      _callAction("approve");
+                                      _callAction('approve');
                                     },
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: Colors.green,
@@ -191,10 +191,10 @@ class _LeaveRequestDetailScreenState extends State<LeaveRequestDetailScreen> {
                                       padding: const EdgeInsets.symmetric(
                                           vertical: 16),
                                     ),
-                                    child: Row(
+                                    child: const Row(
                                       mainAxisAlignment:
                                           MainAxisAlignment.center,
-                                      children: const [
+                                      children: [
                                         Icon(Icons.check, color: Colors.white),
                                         SizedBox(width: 8),
                                         Text(
@@ -213,7 +213,7 @@ class _LeaveRequestDetailScreenState extends State<LeaveRequestDetailScreen> {
                                 Expanded(
                                   child: ElevatedButton(
                                     onPressed: () {
-                                      _callAction("reject");
+                                      _callAction('reject');
                                     },
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: Colors.red,
@@ -224,10 +224,10 @@ class _LeaveRequestDetailScreenState extends State<LeaveRequestDetailScreen> {
                                       padding: const EdgeInsets.symmetric(
                                           vertical: 16),
                                     ),
-                                    child: Row(
+                                    child: const Row(
                                       mainAxisAlignment:
                                           MainAxisAlignment.center,
-                                      children: const [
+                                      children: [
                                         Icon(Icons.close, color: Colors.white),
                                         SizedBox(width: 8),
                                         Text(
@@ -258,11 +258,11 @@ class _LeaveRequestDetailScreenState extends State<LeaveRequestDetailScreen> {
           Icon(icon, color: Colors.blueGrey, size: 20),
           const SizedBox(width: 8),
           Text(
-            "$label: ",
+            '$label: ',
             style: const TextStyle(fontWeight: FontWeight.bold),
           ),
           Expanded(
-            child: Text(value?.toString() ?? "",
+            child: Text(value?.toString() ?? '',
                 style: const TextStyle(color: Colors.black87)),
           ),
         ],
@@ -288,20 +288,20 @@ class _LeaveRequestDetailScreenState extends State<LeaveRequestDetailScreen> {
   String _mapOffType(dynamic offTypeId) {
     switch (offTypeId) {
       case 1:
-        return "Buổi sáng";
+        return 'Buổi sáng';
       case 2:
-        return "Buổi chiều";
+        return 'Buổi chiều';
       case 3:
-        return "Cả ngày";
+        return 'Cả ngày';
       default:
-        return "Không xác định";
+        return 'Không xác định';
     }
   }
 
   String _formatDate(dynamic dateStr) {
-    if (dateStr == null) return "";
+    if (dateStr == null) return '';
     final d = DateTime.tryParse(dateStr.toString());
     if (d == null) return dateStr.toString();
-    return "${d.day}/${d.month}/${d.year}";
+    return '${d.day}/${d.month}/${d.year}';
   }
 }

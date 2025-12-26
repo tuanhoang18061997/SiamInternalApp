@@ -7,14 +7,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '/presentation/providers/auth_provider.dart';
 
 class LeaveRequest {
-  final int id;
-  final String employeeName;
-  final String leaveType;
-  final DateTime startDate;
-  final DateTime endDate;
-  final String reason;
-  final String status;
-
   LeaveRequest({
     required this.id,
     required this.employeeName,
@@ -24,6 +16,25 @@ class LeaveRequest {
     required this.reason,
     required this.status,
   });
+
+  factory LeaveRequest.fromJson(Map<String, dynamic> json) {
+    return LeaveRequest(
+      id: json['id'] is int ? json['id'] : int.parse(json['id'].toString()),
+      employeeName: json['creatorName']?.toString() ?? '',
+      leaveType: json['dayOffTypeName']?.toString() ?? '',
+      startDate: _parseDate(json['fromDate']),
+      endDate: _parseDate(json['toDate']),
+      reason: json['reason']?.toString() ?? '',
+      status: _mapStatus(json['statusId']),
+    );
+  }
+  final int id;
+  final String employeeName;
+  final String leaveType;
+  final DateTime startDate;
+  final DateTime endDate;
+  final String reason;
+  final String status;
 
   static String _mapStatus(dynamic statusIdRaw) {
     final int? statusId = statusIdRaw is int
@@ -46,18 +57,6 @@ class LeaveRequest {
     final d = s != null ? DateTime.tryParse(s) : null;
     return d ?? DateTime.now();
   }
-
-  factory LeaveRequest.fromJson(Map<String, dynamic> json) {
-    return LeaveRequest(
-      id: json['id'] is int ? json['id'] : int.parse(json['id'].toString()),
-      employeeName: json['creatorName']?.toString() ?? '',
-      leaveType: json['dayOffTypeName']?.toString() ?? '',
-      startDate: _parseDate(json['fromDate']),
-      endDate: _parseDate(json['toDate']),
-      reason: json['reason']?.toString() ?? '',
-      status: _mapStatus(json['statusId']),
-    );
-  }
 }
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -71,17 +70,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   List<LeaveRequest> _all = [];
   bool _initialLoading = true;
   String? _error;
-  String _searchQuery = "";
+  String _searchQuery = '';
   String? _displayName;
   late final TabController _tabController;
   //Load page
   late final ScrollController _scrollController;
   bool _loadingMore = false;
-  bool _hasMore = true;
+  final bool _hasMore = true;
   int _currentPage = 1;
   final int _pageSize = 50;
 
-  static const String baseUrl = "http://localhost:5204";
+  static const String baseUrl = 'http://localhost:5204';
 
   @override
   void initState() {
@@ -112,7 +111,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   Future<void> _loadUserInfo() async {
     final prefs = await SharedPreferences.getInstance();
-    setState(() => _displayName = prefs.getString("displayName") ?? "User");
+    setState(() => _displayName = prefs.getString('displayName') ?? 'User');
   }
 
   Future<void> _loadData() async {
@@ -123,15 +122,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString("token");
+      final token = prefs.getString('token');
       if (token == null) {
-        setState(() => _error = "No token found");
+        setState(() => _error = 'No token found');
         return;
       }
 
-      final uri = Uri.parse("$baseUrl/api/Letters");
+      final uri = Uri.parse('$baseUrl/api/Letters');
       final res =
-          await http.get(uri, headers: {"Authorization": "Bearer $token"});
+          await http.get(uri, headers: {'Authorization': 'Bearer $token'});
 
       if (res.statusCode == 200) {
         final body = jsonDecode(res.body);
@@ -151,7 +150,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
         setState(() => _all = newItems);
       } else {
-        setState(() => _error = "Failed: ${res.statusCode}");
+        setState(() => _error = 'Failed: ${res.statusCode}');
       }
     } catch (e) {
       setState(() => _error = e.toString());
@@ -242,7 +241,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             child: _initialLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _error != null
-                    ? Center(child: Text("Lỗi: $_error"))
+                    ? Center(child: Text('Lỗi: $_error'))
                     : TabBarView(
                         controller: _tabController,
                         children: [

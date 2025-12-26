@@ -58,10 +58,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       } else if (next.value != null) {
         // 👉 Lưu token và thông tin user vào SharedPreferences
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString("token", next.value!.token);
-        await prefs.setString("displayName", next.value!.displayName);
-        await prefs.setString("role", next.value!.role);
-        await prefs.setInt("userId", next.value!.employeeId);
+        await prefs.setString('token', next.value!.token);
+        await prefs.setString('displayName', next.value!.displayName);
+        await prefs.setString('role', next.value!.role);
+        await prefs.setInt('userId', next.value!.employeeId);
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

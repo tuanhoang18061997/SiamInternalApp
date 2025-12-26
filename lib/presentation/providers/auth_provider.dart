@@ -8,11 +8,10 @@ import '../../core/network/dio_client.dart';
 final authTokenProvider = StateProvider<String?>((ref) => null);
 
 class AuthNotifier extends StateNotifier<AsyncValue<LoginResponse?>> {
-  final AuthRepository _repository;
-  final Ref _ref;
-
   AuthNotifier(this._repository, this._ref)
       : super(const AsyncValue.data(null));
+  final AuthRepository _repository;
+  final Ref _ref;
 
   Future<void> login(String username, String password) async {
     state = const AsyncValue.loading();
@@ -25,7 +24,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<LoginResponse?>> {
       } else {
         // Sai tài khoản hoặc mật khẩu → chỉ set error string
         state = AsyncValue.error(
-          "Sai tài khoản hoặc mật khẩu",
+          'Sai tài khoản hoặc mật khẩu',
           StackTrace.current,
         );
       }

@@ -1,17 +1,4 @@
 class LeaveRequest {
-  final int id;
-  final String code;
-  final DateTime fromDate;
-  final DateTime toDate;
-  final double daysOff;
-  final String reason;
-  final int statusId;
-  final int offTypeId;
-  final String replacePerson;
-  final String creatorName;
-  final String approverName;
-  final String dayOffTypeName;
-
   LeaveRequest({
     required this.id,
     required this.code,
@@ -26,4 +13,16 @@ class LeaveRequest {
     required this.approverName,
     required this.dayOffTypeName,
   });
+  final int id;
+  final String code;
+  final DateTime fromDate;
+  final DateTime toDate;
+  final double daysOff;
+  final String reason;
+  final int statusId;
+  final int offTypeId;
+  final String replacePerson;
+  final String creatorName;
+  final String approverName;
+  final String dayOffTypeName;
 }

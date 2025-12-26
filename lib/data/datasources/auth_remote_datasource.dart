@@ -3,13 +3,13 @@ import '../../core/constants/api_constants.dart';
 import '../models/login_response_model.dart';
 
 class AuthRemoteDataSource {
-  final Dio dio;
   AuthRemoteDataSource(this.dio);
+  final Dio dio;
 
   Future<LoginResponseModel?> login(String username, String password) async {
     final response = await dio.post(
       ApiConstants.loginEndpoint,
-      data: {"username": username, "password": password},
+      data: {'username': username, 'password': password},
     );
 
     if (response.statusCode == 200) {
@@ -18,7 +18,7 @@ class AuthRemoteDataSource {
       // Sai tài khoản hoặc mật khẩu → trả về null
       return null;
     } else {
-      throw Exception("Server error: ${response.statusCode}");
+      throw Exception('Server error: ${response.statusCode}');
     }
   }
 }
