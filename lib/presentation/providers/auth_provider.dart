@@ -4,6 +4,7 @@ import '../../domain/repositories/auth_repository.dart';
 import '../../data/datasources/auth_remote_datasource.dart';
 import '../../data/repositories/auth_repository_impl.dart';
 import '../../core/network/dio_client.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 final authTokenProvider = StateProvider<String?>((ref) => null);
 
@@ -21,6 +22,8 @@ class AuthNotifier extends StateNotifier<AsyncValue<LoginResponse?>> {
       if (response != null) {
         _ref.read(authTokenProvider.notifier).state = response.token;
         state = AsyncValue.data(response);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setInt('groupId', int.tryParse(response.role) ?? 0);
       } else {
         // Sai tài khoản hoặc mật khẩu → chỉ set error string
         state = AsyncValue.error(

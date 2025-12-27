@@ -15,7 +15,7 @@ namespace SiamInternalApi.Models
         public string Name { get; set; } = "";
 
         [Column("tinh_luong")]
-        public bool TinhLuong { get; set; }
+        public byte TinhLuong { get; set; }
 
         [Column("deleted")]
         public bool Deleted { get; set; }

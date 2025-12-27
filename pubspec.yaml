@@ -24,6 +24,8 @@ dependencies:
   fluttertoast: ^9.0.0
   json_annotation: ^4.9.0
   state_notifier: 1.0.0
+  path_provider: ^2.0.15
+  open_file: ^3.2.1
 
 dev_dependencies:
   flutter_test:

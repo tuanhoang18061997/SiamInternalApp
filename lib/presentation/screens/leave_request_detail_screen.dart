@@ -116,7 +116,20 @@ class _LeaveRequestDetailScreenState extends State<LeaveRequestDetailScreen> {
     }();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Leave Request Detail')),
+      appBar: AppBar(
+          title: const Text('Leave Request Detail',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.5,
+                shadows: [
+                  Shadow(
+                    blurRadius: 4.0,
+                    color: Colors.black45,
+                    offset: Offset(2.0, 2.0),
+                  ),
+                ],
+              ))),
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : error != null
@@ -262,8 +275,7 @@ class _LeaveRequestDetailScreenState extends State<LeaveRequestDetailScreen> {
             style: const TextStyle(fontWeight: FontWeight.bold),
           ),
           Expanded(
-            child: Text(value?.toString() ?? '',
-                style: const TextStyle(color: Colors.black87)),
+            child: Text(value?.toString() ?? ''),
           ),
         ],
       ),

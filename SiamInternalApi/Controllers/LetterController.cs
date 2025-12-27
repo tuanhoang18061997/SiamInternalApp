@@ -18,7 +18,37 @@ namespace SiamInternalApi.Controllers
         {
             _context = context;
         }
-    
+        
+        [HttpGet("leavebalance")]
+        [Authorize]
+        public async Task<IActionResult> GetLeaveBalance()
+        {
+            var userId = int.Parse(User.FindFirst("UserId")!.Value);
+
+
+            const decimal totalDaysPerYear = 12m;
+            var currentYear = DateTime.Now.Year;
+
+            var usedDays = await _context.Letters
+                .Include(l => l.DayOffType)
+                .Where(l => l.CreatorId == userId
+                            && l.StatusId == 3 // approved
+                            && l.FromDate.Year == currentYear
+                            && l.DayOffType != null
+                            && l.DayOffType.TinhLuong == 1)
+                .SumAsync(l => l.DaysOff);
+
+            var remainingDays = totalDaysPerYear - usedDays;
+            if (remainingDays < 0) remainingDays = 0;
+
+            return Ok(new
+            {
+                totalDays = totalDaysPerYear,
+                usedDays,
+                remainingDays
+            });
+        }
+
         // Xem tất cả đơn theo role 
         [HttpGet]
         [Authorize]
@@ -197,6 +227,38 @@ namespace SiamInternalApi.Controllers
             await _context.SaveChangesAsync();
 
             return Ok(new { message = "Letter rejected successfully", id = letter.Id, code = letter.Code });
+        }
+
+        [HttpGet("export")]
+        [Authorize]
+        public async Task<IActionResult> ExportMonthlyReport([FromQuery] int year, [FromQuery] int month)
+        {
+            var groupId = int.Parse(User.FindFirst(ClaimTypes.Role)!.Value);
+
+            if (groupId != 1 && groupId != 2)
+                return Forbid("Only managers can export reports");
+
+            var startDate = new DateTime(year, month, 1);
+            var endDate = startDate.AddMonths(1).AddDays(-1);
+
+            var letters = await _context.Letters
+                .Include(l => l.Creator)
+                .Include(l => l.Approver)
+                .Include(l => l.DayOffType)
+                .Where(l => l.FromDate >= startDate && l.ToDate <= endDate)
+                .OrderBy(l => l.CreatorId)
+                .ToListAsync();
+
+            // Thêm CreateDate và ReplacePerson vào header
+            var lines = new List<string> { "Code,Creator,FromDate,ToDate,DaysOff,Reason,Status,DayOffType,CreateDate,ReplacePerson" };
+            foreach (var l in letters)
+            {
+                lines.Add($"{l.Code},{l.Creator?.Name},{l.FromDate:yyyy-MM-dd},{l.ToDate:yyyy-MM-dd},{l.DaysOff},{l.Reason},{l.StatusId},{l.DayOffType?.Name},{l.CreateDate:yyyy-MM-dd},{l.ReplacePerson}");
+            }
+            var csv = string.Join("\n", lines);
+
+            var bytes = System.Text.Encoding.UTF8.GetBytes(csv);
+            return File(bytes, "text/csv", $"LeaveReport_{year}_{month}.csv");
         }
 
 

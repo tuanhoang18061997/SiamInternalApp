@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart'; // 👉 thêm import này
 import '../providers/auth_provider.dart';
 import '../../domain/entities/login_response.dart';
+import '/presentation/providers/theme_provider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -77,6 +78,40 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     });
 
     return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          'Login Account',
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.5,
+            shadows: [
+              Shadow(
+                blurRadius: 4.0,
+                color: Colors.black45,
+                offset: Offset(2.0, 2.0),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          Consumer(
+            builder: (context, ref, _) {
+              final mode = ref.watch(themeModeProvider);
+              return IconButton(
+                icon: Icon(
+                  mode == ThemeMode.dark ? Icons.light_mode : Icons.dark_mode,
+                ),
+                onPressed: () {
+                  final notifier = ref.read(themeModeProvider.notifier);
+                  notifier.state =
+                      mode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
+                },
+              );
+            },
+          ),
+        ],
+      ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -95,9 +130,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   const SizedBox(height: 24),
                   Text(
                     'Siam Internal App',
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
+                    style: TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.5,
+                      shadows: [
+                        Shadow(
+                          blurRadius: 4.0,
+                          color: Colors.black45,
+                          offset: Offset(2.0, 2.0),
                         ),
+                      ],
+                    ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 8),

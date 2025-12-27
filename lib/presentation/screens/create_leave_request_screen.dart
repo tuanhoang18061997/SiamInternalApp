@@ -153,12 +153,19 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'New Leave Request',
-          style: TextStyle(
-            color: Colors.white,
-          ),
-        ),
+        title: const Text('New Leave Request',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.5,
+              shadows: [
+                Shadow(
+                  blurRadius: 4.0,
+                  color: Colors.black45,
+                  offset: Offset(2.0, 2.0),
+                ),
+              ],
+            )),
         backgroundColor: Colors.indigo,
         elevation: 3,
         foregroundColor: Colors.white,
