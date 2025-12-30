@@ -48,11 +48,11 @@ class LeaveRequest {
         : int.tryParse(statusIdRaw?.toString() ?? '');
     switch (statusId) {
       case 1:
-        return 'pending';
+        return 'Đang chờ duyệt';
       case 3:
-        return 'approved';
+        return 'Đã duyệt';
       case 4:
-        return 'rejected';
+        return 'Không duyệt';
       default:
         return '';
     }
@@ -100,7 +100,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     _scrollController.addListener(_onScroll);
     _loadUserInfo();
     _loadData();
-    _loadLeaveBalance();
   }
 
   Future<void> _exportReport(int year, int month) async {
@@ -129,7 +128,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           );
         }
       } else {
-        // 👉 Trên mobile/desktop: lưu file tạm và mở
         final dir = await getTemporaryDirectory();
         final filePath = '${dir.path}/LeaveReport_${year}_${month}.csv';
         final file = File(filePath);
@@ -155,32 +153,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           ),
         );
       }
-    }
-  }
-
-  Future<void> _loadLeaveBalance() async {
-    setState(() => _loadingBalance = true);
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('token');
-      if (token == null) return;
-
-      final uri = Uri.parse('$baseUrl/api/Letters/leavebalance');
-      final res =
-          await http.get(uri, headers: {'Authorization': 'Bearer $token'});
-
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
-        setState(() {
-          _totalDays = (data['totalDays'] as num).toInt();
-          _usedDays = (data['usedDays'] as num).toDouble();
-          _remainingDays = (data['remainingDays'] as num).toDouble();
-        });
-      }
-    } catch (e) {
-      debugPrint("Error loading leave balance: $e");
-    } finally {
-      setState(() => _loadingBalance = false);
     }
   }
 
@@ -267,13 +239,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 r.leaveType.toLowerCase().contains(q);
           }).toList();
 
-    final pending = filtered.where((r) => r.status == 'pending').toList();
-    final approved = filtered.where((r) => r.status == 'approved').toList();
-    final rejected = filtered.where((r) => r.status == 'rejected').toList();
+    final pending =
+        filtered.where((r) => r.status == 'Đang chờ duyệt').toList();
+    final approved = filtered.where((r) => r.status == 'Đã duyệt').toList();
+    final rejected = filtered.where((r) => r.status == 'Không duyệt').toList();
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Leave Requests',
+        title: const Text('Danh sách đơn xin nghỉ',
             style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.bold,
@@ -289,9 +262,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
-            Tab(text: 'Pending'),
-            Tab(text: 'Approved'),
-            Tab(text: 'Rejected'),
+            Tab(text: 'Đang chờ duyệt'),
+            Tab(text: 'Đã duyệt'),
+            Tab(text: 'Không duyệt'),
           ],
         ),
         actions: [
@@ -411,7 +384,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   children: [
                     Icon(Icons.logout),
                     SizedBox(width: 8),
-                    Text('Logout'),
+                    Text('Đăng xuất'),
                   ],
                 ),
               ),
@@ -433,55 +406,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               onChanged: (value) => setState(() => _searchQuery = value),
             ),
           ),
-          if (_loadingBalance)
-            const LinearProgressIndicator()
-          else if (_totalDays != null)
-            Card(
-              margin: const EdgeInsets.all(12),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-              child: ListTile(
-                leading: const Icon(Icons.beach_access, color: Colors.blue),
-                title: const Text("Leave Balance",
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.5,
-                    )),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Text("Total: ",
-                            style: TextStyle(fontWeight: FontWeight.w600)),
-                        Text("$_totalDays days"),
-                      ],
-                    ),
-                    Row(
-                      children: [
-                        const Text("Used: ",
-                            style: TextStyle(fontWeight: FontWeight.w600)),
-                        Text("$_usedDays days"),
-                      ],
-                    ),
-                    Row(
-                      children: [
-                        const Text("Remaining: ",
-                            style: TextStyle(fontWeight: FontWeight.w600)),
-                        Text("$_remainingDays days",
-                            style: TextStyle(
-                              color: (_remainingDays ?? 0) > 0
-                                  ? Colors.green
-                                  : Colors.red,
-                              fontWeight: FontWeight.bold,
-                            )),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
           Expanded(
             child: _initialLoading
                 ? const Center(child: CircularProgressIndicator())
@@ -501,7 +425,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.push('/create-leave-request'),
         icon: const Icon(Icons.add),
-        label: const Text('New Request'),
+        label: const Text('Tạo đơn mới'),
       ),
     );
   }
@@ -516,9 +440,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             itemBuilder: (context, index) {
               final request = requests[index];
               final statusColor = switch (request.status) {
-                'approved' => Colors.green,
-                'rejected' => Colors.red,
-                _ => Colors.orange, // pending
+                'Đã duyệt' => Colors.green,
+                'Không duyệt' => Colors.red,
+                _ => Colors.orange,
               };
 
               return Card(

@@ -16,12 +16,15 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
   final _reasonController = TextEditingController();
   final _replaceController = TextEditingController();
 
-  String _selectedOffType = 'Full Day';
+  String? _selectedOffType;
   int? _selectedDayOffTypeId;
   DateTime _startDate = DateTime.now();
   DateTime _endDate = DateTime.now();
   bool _submitting = false;
   List<Map<String, dynamic>> _dayOffTypes = [];
+  bool _loadingBalance = true;
+  double? _remainingDays;
+  String? _error;
 
   static const String baseUrl = "http://localhost:5204";
 
@@ -29,6 +32,35 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
   void initState() {
     super.initState();
     _loadDayOffTypes();
+    _loadVacationBalance();
+  }
+
+  Future<void> _loadVacationBalance() async {
+    setState(() => _loadingBalance = true);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString("token");
+      if (token == null) return;
+
+      final uri = Uri.parse("$baseUrl/api/Letters/balance");
+      final res =
+          await http.get(uri, headers: {"Authorization": "Bearer $token"});
+
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        setState(() {
+          _remainingDays = (data["vacationDay"] as num).toDouble();
+        });
+      } else {
+        setState(() {
+          _error = "Failed to load balance: ${res.statusCode}";
+        });
+      }
+    } catch (e) {
+      setState(() => _error = e.toString());
+    } finally {
+      setState(() => _loadingBalance = false);
+    }
   }
 
   Future<void> _loadDayOffTypes() async {
@@ -75,11 +107,57 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+
+    final today = DateTime.now();
+    if (_startDate.isBefore(today) || _endDate.isBefore(today)) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text("Thông báo"),
+          content: const Text("Ngày đã qua không thể chọn để tạo đơn nghỉ."),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("OK"),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    if (_startDate != _endDate &&
+        (_selectedOffType == "Morning" || _selectedOffType == "Afternoon")) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text("Thông báo"),
+          content: const Text(
+              "Không thể tạo đơn buổi sáng/chiều cho nhiều ngày liên tiếp. Vui lòng chọn 'Cả ngày'."),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("OK"),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     if (_selectedDayOffTypeId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text("Please select Day Off Type"),
-            backgroundColor: Colors.red),
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text("Thông báo"),
+          content: const Text("Vui lòng chọn loại ngày nghỉ"),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("OK"),
+            ),
+          ],
+        ),
       );
       return;
     }
@@ -90,9 +168,18 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString("token");
       if (token == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text("No token found"), backgroundColor: Colors.red),
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text("Error"),
+            content: const Text("No token found"),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("OK"),
+              ),
+            ],
+          ),
         );
         return;
       }
@@ -123,22 +210,59 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
           body: jsonEncode(body));
 
       if (res.statusCode == 200) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text("Request submitted successfully"),
-              backgroundColor: Colors.green),
+        // ✅ Thành công
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text("Thông báo"),
+            content: const Text("Bạn đã tạo đơn nghỉ thành công"),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  Navigator.pop(context);
+                },
+                child: const Text("OK"),
+              ),
+            ],
+          ),
         );
-        Navigator.pop(context);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text("Failed: ${res.statusCode}"),
-              backgroundColor: Colors.red),
+        String message;
+        try {
+          final data = jsonDecode(res.body);
+          message = data["title"] ?? data["message"] ?? res.body;
+        } catch (_) {
+          message = res.body;
+        }
+
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text("Thông báo"),
+            content: Text(message),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("OK"),
+              ),
+            ],
+          ),
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text("Thông báo"),
+          content: Text("Unexpected error: $e"),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("OK"),
+            ),
+          ],
+        ),
       );
     } finally {
       setState(() => _submitting = false);
@@ -153,7 +277,7 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('New Leave Request',
+        title: const Text('Tạo đơn nghỉ phép',
             style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.bold,
@@ -169,6 +293,34 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
         backgroundColor: Colors.indigo,
         elevation: 3,
         foregroundColor: Colors.white,
+        actions: [
+          if (_loadingBalance)
+            const Padding(
+              padding: EdgeInsets.only(right: 16),
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              ),
+            )
+          else if (_remainingDays != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: Center(
+                child: Text(
+                  "Ngày phép còn lại : $_remainingDays ngày",
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -182,13 +334,12 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
               key: _formKey,
               child: Column(
                 children: [
-                  // Header
                   Row(
                     children: [
                       const Icon(Icons.event_note, color: Colors.indigo),
                       const SizedBox(width: 8),
                       Text(
-                        "Leave details",
+                        "Thông tin đơn nghỉ",
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w700,
                         ),
@@ -200,17 +351,22 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
                   //OffType drop
                   DropdownButtonFormField<String>(
                     value: _selectedOffType,
-                    items: ['Full Day', 'Morning', 'Afternoon']
-                        .map((type) =>
-                            DropdownMenuItem(value: type, child: Text(type)))
-                        .toList(),
-                    onChanged: (val) => setState(() => _selectedOffType = val!),
+                    items: [
+                      const DropdownMenuItem(
+                          value: null, child: Text("Vui lòng chọn buổi nghỉ")),
+                      const DropdownMenuItem(
+                          value: "Full Day", child: Text("Cả ngày")),
+                      const DropdownMenuItem(
+                          value: "Morning", child: Text("Buổi sáng")),
+                      const DropdownMenuItem(
+                          value: "Afternoon", child: Text("Buổi chiều")),
+                    ],
+                    onChanged: (val) => setState(() => _selectedOffType = val),
+                    validator: (v) =>
+                        v == null ? "Vui lòng chọn buổi nghỉ" : null,
                     decoration: const InputDecoration(
-                      labelText: 'Off Type',
-                      prefixIcon:
-                          const Icon(Icons.access_time, color: Colors.indigo),
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.all(Radius.circular(12))),
+                      labelText: 'Buổi nghỉ',
+                      border: OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -219,28 +375,28 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
                   _dayOffTypes.isEmpty
                       ? const LinearProgressIndicator(minHeight: 4)
                       : DropdownButtonFormField<int>(
-                          value: _selectedDayOffTypeId,
-                          items: _dayOffTypes.map((type) {
-                            return DropdownMenuItem<int>(
-                              value: type["id"],
-                              child: Text(type["name"]),
-                            );
-                          }).toList(),
+                          items: [
+                            const DropdownMenuItem(
+                                value: null,
+                                child: Text("Vui lòng chọn loại ngày nghỉ")),
+                            ..._dayOffTypes.map((type) {
+                              return DropdownMenuItem<int>(
+                                value: type["id"],
+                                child: Text(type["name"]),
+                              );
+                            }).toList(),
+                          ],
                           onChanged: (val) =>
                               setState(() => _selectedDayOffTypeId = val),
-                          decoration: InputDecoration(
-                            labelText: 'Day off type',
-                            prefixIcon: const Icon(Icons.work_outline,
-                                color: Colors.indigo),
-                            border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12)),
-                          ),
                           validator: (v) =>
-                              v == null ? "Please select day off type" : null,
+                              v == null ? "Vui lòng chọn loại ngày nghỉ" : null,
+                          decoration: const InputDecoration(
+                            labelText: 'Loại ngày nghỉ',
+                            border: OutlineInputBorder(),
+                          ),
                         ),
                   const SizedBox(height: 20),
 
-                  // Start / End date
                   Row(
                     children: [
                       Expanded(
@@ -249,7 +405,7 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
                           onTap: () => _pickDate(isStart: true),
                           child: InputDecorator(
                             decoration: InputDecoration(
-                              labelText: 'Start date',
+                              labelText: 'Ngày bắt đầu',
                               prefixIcon: const Icon(Icons.calendar_today,
                                   color: Colors.indigo),
                               border: OutlineInputBorder(
@@ -266,7 +422,7 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
                           onTap: () => _pickDate(isStart: false),
                           child: InputDecorator(
                             decoration: InputDecoration(
-                              labelText: 'End date',
+                              labelText: 'Ngày kết thúc',
                               prefixIcon: const Icon(Icons.calendar_today,
                                   color: Colors.indigo),
                               border: OutlineInputBorder(
@@ -284,7 +440,7 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
                   TextFormField(
                     controller: _reasonController,
                     decoration: InputDecoration(
-                      labelText: 'Reason',
+                      labelText: 'Lý do',
                       hintText: 'Ví dụ: Khám bệnh',
                       prefixIcon: const Icon(Icons.notes, color: Colors.indigo),
                       border: OutlineInputBorder(
@@ -292,7 +448,7 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
                     ),
                     maxLines: 3,
                     validator: (v) => v == null || v.trim().isEmpty
-                        ? "Please enter reason"
+                        ? "Vui lòng nhập lý do xin nghỉ"
                         : null,
                   ),
                   const SizedBox(height: 16),
@@ -301,8 +457,8 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
                   TextFormField(
                     controller: _replaceController,
                     decoration: InputDecoration(
-                      labelText: 'Replace person (optional)',
-                      hintText: 'Tên người thay thế',
+                      labelText: 'Người bàn giao',
+                      hintText: 'Tên người bàn giao',
                       prefixIcon: const Icon(Icons.person_outline,
                           color: Colors.indigo),
                       border: OutlineInputBorder(
@@ -325,7 +481,7 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
                             )
                           : const Icon(Icons.send),
                       label: Text(
-                        _submitting ? "Submitting..." : "Submit request",
+                        _submitting ? "Submitting..." : "Gửi đơn nghỉ",
                         style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,

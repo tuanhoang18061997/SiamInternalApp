@@ -49,8 +49,8 @@ namespace SiamInternalApi.Models
         public string? ReplacePerson { get; set; }
 
         // Navigation
-        public User? Creator { get; set; }
-        public User? Approver { get; set; }
+        public Employee? Creator { get; set; }
+        public Employee? Approver { get; set; }
         public DayOffType? DayOffType { get; set; }
     }
 }

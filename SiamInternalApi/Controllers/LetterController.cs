@@ -19,43 +19,19 @@ namespace SiamInternalApi.Controllers
             _context = context;
         }
         
-        [HttpGet("leavebalance")]
-        [Authorize]
-        public async Task<IActionResult> GetLeaveBalance()
-        {
-            var userId = int.Parse(User.FindFirst("UserId")!.Value);
 
-
-            const decimal totalDaysPerYear = 12m;
-            var currentYear = DateTime.Now.Year;
-
-            var usedDays = await _context.Letters
-                .Include(l => l.DayOffType)
-                .Where(l => l.CreatorId == userId
-                            && l.StatusId == 3 // approved
-                            && l.FromDate.Year == currentYear
-                            && l.DayOffType != null
-                            && l.DayOffType.TinhLuong == 1)
-                .SumAsync(l => l.DaysOff);
-
-            var remainingDays = totalDaysPerYear - usedDays;
-            if (remainingDays < 0) remainingDays = 0;
-
-            return Ok(new
-            {
-                totalDays = totalDaysPerYear,
-                usedDays,
-                remainingDays
-            });
-        }
-
-        // Xem tất cả đơn theo role 
+        // Xem tất cả đơn  
         [HttpGet]
         [Authorize]
         public async Task<IActionResult> GetLetters()
         {
-            var userId = int.Parse(User.FindFirst("UserId")!.Value);
-            var groupId = int.Parse(User.FindFirst(ClaimTypes.Role)!.Value);
+            var employeeIdClaim = User.FindFirst("EmployeeId")?.Value;
+            var roleClaim = User.FindFirst(ClaimTypes.Role)?.Value;
+            if (string.IsNullOrEmpty(employeeIdClaim) || string.IsNullOrEmpty(roleClaim))
+                return Problem("Missing EmployeeId or Role claim.");
+
+            var employeeId = int.Parse(employeeIdClaim);
+            var groupId = int.Parse(roleClaim);
 
             var query = _context.Letters
                 .Include(l => l.Creator)
@@ -65,24 +41,26 @@ namespace SiamInternalApi.Controllers
 
             if (groupId == 1 || groupId == 2)
             {
-                // Manager → xem tất cả đơn
-            }
-            else if (groupId >= 3 && groupId <= 7)
-            {
-                // Employee → chỉ xem đơn của mình
-                query = query.Where(l => l.CreatorId == userId);
+                // Admin/Manager → xem tất cả đơn
             }
             else
             {
-                return Forbid("Invalid group_id");
+                // Lấy danh sách nhân viên mà current employee là approver
+                var managedEmployeeIds = await _context.EmployeeConfigs
+                    .Where(ec => ec.Approved1Id == employeeId
+                            || ec.Approved2Id == employeeId
+                            || ec.Approved3Id == employeeId)
+                    .Select(ec => ec.EmployeeId)
+                    .ToListAsync();
+
+                // Đơn của mình + đơn nhân viên mình quản lý
+                query = query.Where(l => l.CreatorId == employeeId || managedEmployeeIds.Contains(l.CreatorId));
             }
 
-            // Lấy toàn bộ record
             var letters = await query
                 .OrderByDescending(l => l.Id)
                 .ToListAsync();
 
-            // Map sang DTO và lọc record hợp lệ
             var result = letters
                 .Select(MapToViewDto)
                 .Where(dto => dto != null)
@@ -90,10 +68,13 @@ namespace SiamInternalApi.Controllers
 
             return Ok(new
             {
-                totalCount = result.Count, // tổng số record hợp lệ
+                totalCount = result.Count,
                 items = result
             });
         }
+
+
+
 
         [HttpGet("dayofftypes")]
         [Authorize]
@@ -115,7 +96,7 @@ namespace SiamInternalApi.Controllers
         [Authorize]
         public async Task<IActionResult> GetLetterById(int id)
         {
-            var userId = int.Parse(User.FindFirst("UserId")!.Value);
+            var employeeId = int.Parse(User.FindFirst("EmployeeId")!.Value);
             var groupId = int.Parse(User.FindFirst(ClaimTypes.Role)!.Value);
 
             var letter = await _context.Letters
@@ -126,33 +107,105 @@ namespace SiamInternalApi.Controllers
 
             if (letter == null) return NotFound();
 
-            if (groupId == 1 || groupId == 2 || (groupId >= 3 && groupId <= 7 && letter.CreatorId == userId))
+            var managedEmployeeIds = await _context.EmployeeConfigs
+                .Where(ec => ec.Approved1Id == employeeId
+                        || ec.Approved2Id == employeeId
+                        || ec.Approved3Id == employeeId)
+                .Select(ec => ec.EmployeeId)
+                .ToListAsync();
+
+            // 👉 Kiểm tra quyền duyệt/từ chối
+            bool canApprove = false;
+            if (groupId == 1 || groupId == 2)
             {
-                var dto = MapToViewDto(letter); 
-                return Ok(new 
-                { 
-                    dto.Id, dto.Code, dto.FromDate, dto.ToDate, dto.DaysOff, dto.CreateDate, dto.ApprovalDate, dto.Reason, dto.StatusId, dto.OffTypeId, dto.ReplacePerson, dto.CreatorName, dto.ApproverName, dto.DayOffTypeName, currentUserGroupId = groupId // thêm role hiện tại 
+                canApprove = true; // Admin/Manager
+            }
+            else
+            {
+                var config = await _context.EmployeeConfigs
+                    .FirstOrDefaultAsync(ec => ec.EmployeeId == letter.CreatorId);
+
+                if (config != null)
+                {
+                    if (config.Approved1Id == employeeId ||
+                        config.Approved2Id == employeeId ||
+                        config.Approved3Id == employeeId)
+                    {
+                        canApprove = true; // Leader phụ trách trực tiếp
+                    }
+                }
+            }
+
+            if (groupId == 1 || groupId == 2 
+                || letter.CreatorId == employeeId 
+                || managedEmployeeIds.Contains(letter.CreatorId))
+            {
+                var dto = MapToViewDto(letter);
+                return Ok(new {
+                    dto.Id,
+                    dto.Code,
+                    dto.FromDate,
+                    dto.ToDate,
+                    dto.DaysOff,
+                    dto.CreateDate,
+                    dto.ApprovalDate,
+                    dto.Reason,
+                    dto.StatusId,
+                    dto.OffTypeId,
+                    dto.ReplacePerson,
+                    dto.CreatorName,
+                    dto.ApproverName,
+                    dto.DayOffTypeName,
+                    currentUserGroupId = groupId,
+                    canApprove // 👉 thêm field này
                 });
             }
 
-            return Forbid("You can only view your own letters");
+            return Forbid("You can only view your own letters or those you manage");
         }
-
+        
+        //Tạo đơn
         [HttpPost]
         [Authorize]
         public async Task<IActionResult> CreateLetter([FromBody] LetterCreateDto dto)
         {
-            var userId = int.Parse(User.FindFirst("UserId")!.Value);
+            if (string.IsNullOrWhiteSpace(dto.Reason))
+            {
+                return BadRequest("Reason is required");
+            }
 
-            var totalDays = (dto.ToDate.Date - dto.FromDate.Date).TotalDays ;
+            var employeeId = int.Parse(User.FindFirst("EmployeeId")!.Value);
+
+            // 👉 Kiểm tra trùng ngày
+            var hasOverlap = await _context.Letters.AnyAsync(l =>
+                l.CreatorId == employeeId &&
+                l.StatusId != 4 && // bỏ qua đơn đã bị reject
+                l.FromDate <= dto.ToDate.Date &&
+                l.ToDate >= dto.FromDate.Date
+            );
+
+            if (hasOverlap)
+            {
+                return BadRequest("Bạn đã có đơn nghỉ trong khoảng ngày này, không thể tạo thêm.");
+            }
+
+            double totalDays = 0;
             if (dto.OffTypeId == 1 || dto.OffTypeId == 2)
             {
                 totalDays = 0.5;
             }
+            else if (dto.OffTypeId == 3)
+            {
+                totalDays = (dto.ToDate.Date - dto.FromDate.Date).TotalDays + 1;
+            }
+            else
+            {
+                return BadRequest("Invalid OffTypeId");
+            }
 
             var letter = new Letter
             {
-                CreatorId = userId,
+                CreatorId = employeeId,
                 FromDate = dto.FromDate.Date,
                 ToDate = dto.ToDate.Date,
                 DaysOff = (decimal)totalDays,
@@ -162,41 +215,91 @@ namespace SiamInternalApi.Controllers
                 ReplacePerson = string.IsNullOrWhiteSpace(dto.ReplacePerson) ? "" : dto.ReplacePerson,
                 StatusId = (byte?)1, // pending
                 CreateDate = DateTime.Now,
-
-                // Gán giá trị mặc định để tránh null
-                ApprovalDate = DateTime.MinValue, 
-                ApproverId = 0 
+                ApprovalDate = DateTime.MinValue,
+                ApproverId = 0
             };
-
 
             _context.Letters.Add(letter);
             await _context.SaveChangesAsync();
 
-            // Sau khi có Id thì sinh Code
+            // Sinh mã đơn sau khi có Id
             letter.Code = $"DXN{letter.Id.ToString().PadLeft(6, '0')}";
             await _context.SaveChangesAsync();
 
             return Ok(new { message = "Tạo đơn thành công", id = letter.Id, code = letter.Code });
         }
 
-        [HttpPut("{id}/approve")]
-        [Authorize]
-        public async Task<IActionResult> ApproveLetter(int id)
-        {
-            var userId = int.Parse(User.FindFirst("UserId")!.Value);
-            var groupId = int.Parse(User.FindFirst(ClaimTypes.Role)!.Value);
 
+
+        [HttpPut("{id}/update")]
+        [Authorize]
+        public async Task<IActionResult> UpdateStatus(int id, [FromBody] byte newStatusId)
+        {
+            var employeeId = int.Parse(User.FindFirst("EmployeeId")!.Value);
+            var groupId = int.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.Role)!.Value);
+
+            // Chỉ admin/manager mới được phép
             if (groupId != 1 && groupId != 2)
-                return Forbid("Only managers can approve letters");
+                return Forbid("Only admins/managers can update status");
 
             var letter = await _context.Letters.FindAsync(id);
             if (letter == null) return NotFound("Letter not found");
 
-            if (letter.StatusId != 1)
-                return BadRequest("Only pending letters can be approved");
+            // Cập nhật trạng thái
+            letter.StatusId = newStatusId;
+            letter.ApproverId = employeeId;
+            letter.ApprovalDate = DateTime.Now;
 
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Status updated successfully", id = letter.Id, code = letter.Code, status = newStatusId });
+        }
+
+
+        [HttpPut("{id}/approve")]
+        [Authorize]
+        public async Task<IActionResult> ApproveLetter(int id)
+        {
+            var employeeId = int.Parse(User.FindFirst("EmployeeId")!.Value);
+            var groupId = int.Parse(User.FindFirst(ClaimTypes.Role)!.Value);
+
+            var letter = await _context.Letters
+                .Include(l => l.Creator)
+                .FirstOrDefaultAsync(l => l.Id == id);
+
+            if (letter == null) return NotFound("Letter not found");
+            if (letter.StatusId != 1) return BadRequest("Only pending letters can be approved");
+
+            bool canApprove = false;
+
+            if (groupId == 1 || groupId == 2)
+            {
+                // Admin/Manager → luôn có quyền duyệt
+                canApprove = true;
+            }
+            else
+            {
+                // Kiểm tra leader có nằm trong approver1/2/3 của nhân viên tạo đơn
+                var config = await _context.EmployeeConfigs
+                    .FirstOrDefaultAsync(ec => ec.EmployeeId == letter.CreatorId);
+
+                if (config != null)
+                {
+                    if (config.Approved1Id == employeeId ||
+                        config.Approved2Id == employeeId ||
+                        config.Approved3Id == employeeId)
+                    {
+                        canApprove = true;
+                    }
+                }
+            }
+
+            if (!canApprove)
+                return Forbid("You are not allowed to approve this letter");
+
+            // Cập nhật trạng thái
             letter.StatusId = 3; // approved
-            letter.ApproverId = userId;
+            letter.ApproverId = employeeId;
             letter.ApprovalDate = DateTime.Now;
 
             await _context.SaveChangesAsync();
@@ -204,30 +307,55 @@ namespace SiamInternalApi.Controllers
             return Ok(new { message = "Letter approved successfully", id = letter.Id, code = letter.Code });
         }
 
+
         [HttpPut("{id}/reject")]
         [Authorize]
         public async Task<IActionResult> RejectLetter(int id)
         {
-            var userId = int.Parse(User.FindFirst("UserId")!.Value);
+            var employeeId = int.Parse(User.FindFirst("EmployeeId")!.Value);
             var groupId = int.Parse(User.FindFirst(ClaimTypes.Role)!.Value);
 
-            if (groupId != 1 && groupId != 2)
-                return Forbid("Only managers can reject letters");
+            var letter = await _context.Letters
+                .Include(l => l.Creator)
+                .FirstOrDefaultAsync(l => l.Id == id);
 
-            var letter = await _context.Letters.FindAsync(id);
             if (letter == null) return NotFound("Letter not found");
+            if (letter.StatusId != 1) return BadRequest("Only pending letters can be rejected");
 
-            if (letter.StatusId != 1)
-                return BadRequest("Only pending letters can be rejected");
+            bool canReject = false;
+
+            if (groupId == 1 || groupId == 2)
+            {
+                canReject = true;
+            }
+            else
+            {
+                var config = await _context.EmployeeConfigs
+                    .FirstOrDefaultAsync(ec => ec.EmployeeId == letter.CreatorId);
+
+                if (config != null)
+                {
+                    if (config.Approved1Id == employeeId ||
+                        config.Approved2Id == employeeId ||
+                        config.Approved3Id == employeeId)
+                    {
+                        canReject = true;
+                    }
+                }
+            }
+
+            if (!canReject)
+                return Forbid("You are not allowed to reject this letter");
 
             letter.StatusId = 4; // rejected
-            letter.ApproverId = userId;
+            letter.ApproverId = employeeId;
             letter.ApprovalDate = DateTime.Now;
 
             await _context.SaveChangesAsync();
 
             return Ok(new { message = "Letter rejected successfully", id = letter.Id, code = letter.Code });
         }
+
 
         [HttpGet("export")]
         [Authorize]
@@ -249,7 +377,6 @@ namespace SiamInternalApi.Controllers
                 .OrderBy(l => l.CreatorId)
                 .ToListAsync();
 
-            // Thêm CreateDate và ReplacePerson vào header
             var lines = new List<string> { "Code,Creator,FromDate,ToDate,DaysOff,Reason,Status,DayOffType,CreateDate,ReplacePerson" };
             foreach (var l in letters)
             {
@@ -260,6 +387,26 @@ namespace SiamInternalApi.Controllers
             var bytes = System.Text.Encoding.UTF8.GetBytes(csv);
             return File(bytes, "text/csv", $"LeaveReport_{year}_{month}.csv");
         }
+
+        [HttpGet("balance")]
+        [Authorize]
+        public async Task<IActionResult> GetVacationBalance()
+        {
+            var employeeId = int.Parse(User.FindFirst("EmployeeId")!.Value);
+
+            var config = await _context.EmployeeConfigs
+                .FirstOrDefaultAsync(ec => ec.EmployeeId == employeeId);
+
+            if (config == null)
+                return NotFound("Employee config not found");
+
+            return Ok(new
+            {
+                employeeId = employeeId,
+                vacationDay = config.VacationDay
+            });
+        }
+
 
 
         // Helper để map sang DTO hiển thị

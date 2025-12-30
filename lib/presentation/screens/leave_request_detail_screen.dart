@@ -26,6 +26,79 @@ class _LeaveRequestDetailScreenState extends State<LeaveRequestDetailScreen> {
     _loadDetail();
   }
 
+  void _showUpdateDialog(int letterId, int currentStatus) {
+    int selectedStatus = currentStatus;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text("Cập nhật trạng thái đơn"),
+              content: DropdownButtonFormField<int>(
+                value: selectedStatus,
+                items: const [
+                  DropdownMenuItem(value: 1, child: Text("Đang chờ duyệt")),
+                  DropdownMenuItem(value: 3, child: Text("Đã duyệt")),
+                  DropdownMenuItem(value: 4, child: Text("Không duyệt")),
+                ],
+                onChanged: (val) {
+                  if (val != null) setState(() => selectedStatus = val);
+                },
+                decoration: const InputDecoration(labelText: "Trạng thái"),
+              ),
+              actions: [
+                TextButton(
+                  child: const Text("Hủy"),
+                  onPressed: () => Navigator.pop(context),
+                ),
+                ElevatedButton(
+                  child: const Text("Cập nhật"),
+                  onPressed: () async {
+                    Navigator.pop(context);
+                    await _updateStatus(letterId, selectedStatus);
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _updateStatus(int letterId, int newStatus) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+    if (token == null) return;
+
+    final uri = Uri.parse('$baseUrl/api/Letters/$letterId/update');
+    final res = await http.put(
+      uri,
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode(newStatus),
+    );
+
+    if (res.statusCode == 200) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text("Cập nhật thành công"),
+            backgroundColor: Colors.green),
+      );
+      _loadDetail();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text("Lỗi: ${res.statusCode}"),
+            backgroundColor: Colors.red),
+      );
+    }
+  }
+
   Future<void> _callAction(String action) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -105,19 +178,17 @@ class _LeaveRequestDetailScreenState extends State<LeaveRequestDetailScreen> {
       final statusId = request?['statusId'];
       switch (statusId) {
         case 3:
-          return Colors.green; // approved
+          return Colors.green; // Đã duyệt
         case 4:
-          return Colors.red; // rejected
-        case 2:
-          return Colors.grey; // canceled
+          return Colors.red; // Không duyệt
         default:
-          return Colors.orange; // pending
+          return Colors.orange; // Đang chờ duyệt
       }
     }();
 
     return Scaffold(
       appBar: AppBar(
-          title: const Text('Leave Request Detail',
+          title: const Text('Thông tin đơn xin nghỉ',
               style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
@@ -151,34 +222,72 @@ class _LeaveRequestDetailScreenState extends State<LeaveRequestDetailScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  _buildRow(Icons.confirmation_number, 'Code',
+                                  _buildRow(Icons.confirmation_number, 'Mã đơn',
                                       request!['code']),
-                                  _buildRow(Icons.person, 'Employee',
+                                  _buildRow(Icons.person, 'Tên nhân viên',
                                       request!['creatorName']),
-                                  _buildRow(Icons.work, 'Leave Type',
+                                  _buildRow(Icons.work, 'Loại nghỉ',
                                       request!['dayOffTypeName']),
-                                  _buildRow(Icons.access_time, 'Off Type',
+                                  _buildRow(Icons.access_time, 'Buổi nghỉ',
                                       _mapOffType(request!['offTypeId'])),
-                                  _buildRow(Icons.calendar_today, 'Start Date',
+                                  _buildRow(
+                                      Icons.calendar_today,
+                                      'Ngày bắt đầu',
                                       _formatDate(request!['fromDate'])),
-                                  _buildRow(Icons.calendar_today, 'End Date',
+                                  _buildRow(
+                                      Icons.calendar_today,
+                                      'Ngày kết thúc',
                                       _formatDate(request!['toDate'])),
-                                  _buildRow(Icons.notes, 'Reason',
-                                      request!['reason']),
+                                  _buildRow(
+                                      Icons.notes, 'Lý do', request!['reason']),
                                   const SizedBox(height: 12),
-                                  Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: statusColor.withOpacity(0.2),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Text(
-                                      "Status: ${_mapStatus(request!['statusId']).toUpperCase()}",
-                                      style: TextStyle(
-                                        color: statusColor,
-                                        fontWeight: FontWeight.bold,
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: statusColor.withOpacity(0.2),
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                        ),
+                                        child: Text(
+                                          "Trạng thái đơn: ${_mapStatus(request!['statusId']).toUpperCase()}",
+                                          style: TextStyle(
+                                            color: statusColor,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
                                       ),
-                                    ),
+                                      if (groupId == 1 || groupId == 2)
+                                        ElevatedButton.icon(
+                                          icon: const Icon(Icons.edit,
+                                              color: Colors.white, size: 18),
+                                          label: const Text(
+                                            "Cập nhật",
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.blueGrey,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
+                                            elevation: 3,
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 12, vertical: 8),
+                                          ),
+                                          onPressed: () {
+                                            _showUpdateDialog(request!['id'],
+                                                request!['statusId']);
+                                          },
+                                        ),
+                                    ],
                                   ),
                                 ],
                               ),
@@ -187,7 +296,7 @@ class _LeaveRequestDetailScreenState extends State<LeaveRequestDetailScreen> {
                           const SizedBox(height: 24),
                           // Chỉ hiện nút nếu pending và role là manager
                           if (request!['statusId'] == 1 &&
-                              (groupId == 1 || groupId == 2))
+                              request!['canApprove'] == true)
                             Row(
                               children: [
                                 Expanded(
@@ -211,7 +320,7 @@ class _LeaveRequestDetailScreenState extends State<LeaveRequestDetailScreen> {
                                         Icon(Icons.check, color: Colors.white),
                                         SizedBox(width: 8),
                                         Text(
-                                          'Approve',
+                                          'Duyệt đơn',
                                           style: TextStyle(
                                             color: Colors.white,
                                             fontSize: 16,
@@ -244,7 +353,7 @@ class _LeaveRequestDetailScreenState extends State<LeaveRequestDetailScreen> {
                                         Icon(Icons.close, color: Colors.white),
                                         SizedBox(width: 8),
                                         Text(
-                                          'Reject',
+                                          'Không duyệt đơn',
                                           style: TextStyle(
                                             color: Colors.white,
                                             fontSize: 16,
@@ -256,7 +365,7 @@ class _LeaveRequestDetailScreenState extends State<LeaveRequestDetailScreen> {
                                   ),
                                 ),
                               ],
-                            )
+                            ),
                         ],
                       ),
                     ),
@@ -285,15 +394,13 @@ class _LeaveRequestDetailScreenState extends State<LeaveRequestDetailScreen> {
   String _mapStatus(dynamic statusId) {
     switch (statusId) {
       case 1:
-        return 'pending';
-      case 2:
-        return 'canceled';
+        return 'Đang chờ duyệt';
       case 3:
-        return 'approved';
+        return 'Đã duyệt';
       case 4:
-        return 'rejected';
+        return 'Không duyệt';
       default:
-        return 'pending';
+        return 'unknown';
     }
   }
 

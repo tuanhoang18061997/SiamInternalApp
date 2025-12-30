@@ -4,9 +4,9 @@ namespace SiamInternalApi.DTO
     {
         public DateTime FromDate { get; set; }
         public DateTime ToDate { get; set; }
-        public int DayOffTypeId { get; set; }   // loại nghỉ (phép, bù, công tác…)
-        public int OffTypeId { get; set; }      // buổi nghỉ (1 = sáng, 2 = chiều, 3 = cả ngày)
+        public int DayOffTypeId { get; set; } 
+        public int OffTypeId { get; set; }    
         public string Reason { get; set; } = "";
-        public string? ReplacePerson { get; set; } // bàn giao (nếu có)
+        public string? ReplacePerson { get; set; }
     }
 }
