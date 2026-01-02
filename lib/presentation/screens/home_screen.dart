@@ -77,6 +77,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   bool _initialLoading = true;
   String? _error;
   String _searchQuery = '';
+  bool _showSearch = false;
   String? _displayName;
   late final TabController _tabController;
   late final ScrollController _scrollController;
@@ -246,7 +247,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Danh sách đơn xin nghỉ',
+        title: const Text('Danh sách đơn',
             style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.bold,
@@ -268,6 +269,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           ],
         ),
         actions: [
+          IconButton(
+            icon: Icon(_showSearch ? Icons.close : Icons.search),
+            onPressed: () {
+              setState(() {
+                _showSearch = !_showSearch;
+                if (!_showSearch) {
+                  _searchQuery = '';
+                }
+              });
+            },
+          ),
           if (_groupId == 1 || _groupId == 2) // chỉ manager
             IconButton(
               icon: const Icon(Icons.download),
@@ -395,17 +407,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       body: Column(
         children: [
           // Thanh tìm kiếm
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: TextField(
-              decoration: const InputDecoration(
-                prefixIcon: Icon(Icons.search),
-                hintText: 'Tìm theo tên, lý do hoặc loại nghỉ...',
-                border: OutlineInputBorder(),
+          if (_showSearch)
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: TextField(
+                autofocus: true,
+                decoration: const InputDecoration(
+                  prefixIcon: Icon(Icons.search),
+                  hintText: 'Tìm theo tên, lý do hoặc loại nghỉ...',
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: (value) {
+                  setState(() {
+                    _searchQuery = value;
+                  });
+                },
+                onSubmitted: (value) {
+                  setState(() {
+                    _searchQuery = value;
+                    _showSearch = false;
+                  });
+                },
               ),
-              onChanged: (value) => setState(() => _searchQuery = value),
             ),
-          ),
           Expanded(
             child: _initialLoading
                 ? const Center(child: CircularProgressIndicator())

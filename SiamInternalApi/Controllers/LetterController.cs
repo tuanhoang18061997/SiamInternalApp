@@ -116,9 +116,11 @@ namespace SiamInternalApi.Controllers
 
             // 👉 Kiểm tra quyền duyệt/từ chối
             bool canApprove = false;
-            if (groupId == 1 || groupId == 2)
-            {
-                canApprove = true; // Admin/Manager
+            if (groupId == 1 || groupId == 2) 
+            { 
+                if (letter.StatusId == 1) 
+                    canApprove = true; 
+                else canApprove = false; 
             }
             else
             {
@@ -127,14 +129,33 @@ namespace SiamInternalApi.Controllers
 
                 if (config != null)
                 {
-                    if (config.Approved1Id == employeeId ||
-                        config.Approved2Id == employeeId ||
-                        config.Approved3Id == employeeId)
+                    // Không cho phép người đã duyệt trước đó tự thay đổi quyết định
+                    if (letter.ApproverId == employeeId)
                     {
-                        canApprove = true; // Leader phụ trách trực tiếp
+                        canApprove = false;
+                    }
+                    else
+                    {
+                        // Leader cấp 1: duyệt khi pending
+                        if (config.Approved1Id == employeeId && letter.ApproverId == 0)
+                            canApprove = true;
+
+                        // Leader cấp 2: duyệt khi pending hoặc override quyết định của cấp 1
+                        if (config.Approved2Id == employeeId &&
+                            (letter.ApproverId == 0 || letter.ApproverId == config.Approved1Id))
+                            canApprove = true;
+
+                        // Leader cấp 3: duyệt khi pending hoặc override quyết định của cấp 1 và 2
+                        if (config.Approved3Id == employeeId &&
+                            (letter.ApproverId == 0 ||
+                            letter.ApproverId == config.Approved1Id ||
+                            letter.ApproverId == config.Approved2Id))
+                            canApprove = true;
                     }
                 }
+
             }
+
 
             if (groupId == 1 || groupId == 2 
                 || letter.CreatorId == employeeId 
@@ -157,7 +178,7 @@ namespace SiamInternalApi.Controllers
                     dto.ApproverName,
                     dto.DayOffTypeName,
                     currentUserGroupId = groupId,
-                    canApprove // 👉 thêm field này
+                    canApprove 
                 });
             }
 
@@ -176,7 +197,12 @@ namespace SiamInternalApi.Controllers
 
             var employeeId = int.Parse(User.FindFirst("EmployeeId")!.Value);
 
-            // 👉 Kiểm tra trùng ngày
+            var config = await _context.EmployeeConfigs 
+                .FirstOrDefaultAsync(ec => ec.EmployeeId == employeeId); 
+
+            if (config == null) return NotFound("Employee config not found");
+
+            //  Kiểm tra trùng ngày
             var hasOverlap = await _context.Letters.AnyAsync(l =>
                 l.CreatorId == employeeId &&
                 l.StatusId != 4 && // bỏ qua đơn đã bị reject
@@ -201,6 +227,11 @@ namespace SiamInternalApi.Controllers
             else
             {
                 return BadRequest("Invalid OffTypeId");
+            }
+            
+            //Nếu loại ngày nghỉ là Nghỉ phép check ngày nghỉ còn lại
+            if (dto.DayOffTypeId == 1 && config.VacationDay < (decimal)totalDays) { 
+                return BadRequest("Bạn không đủ ngày phép để tạo đơn này."); 
             }
 
             var letter = new Letter
@@ -247,13 +278,29 @@ namespace SiamInternalApi.Controllers
 
             // Cập nhật trạng thái
             letter.StatusId = newStatusId;
-            letter.ApproverId = employeeId;
-            letter.ApprovalDate = DateTime.Now;
+
+            if (newStatusId == 1) // 👉 Nếu cập nhật về Pending
+            {
+                letter.ApproverId = 0;
+                letter.ApprovalDate = DateTime.MinValue;
+            }
+            else
+            {
+                letter.ApproverId = employeeId;
+                letter.ApprovalDate = DateTime.Now;
+            }
 
             await _context.SaveChangesAsync();
 
-            return Ok(new { message = "Status updated successfully", id = letter.Id, code = letter.Code, status = newStatusId });
+            return Ok(new
+            {
+                message = "Status updated successfully",
+                id = letter.Id,
+                code = letter.Code,
+                status = newStatusId
+            });
         }
+
 
 
         [HttpPut("{id}/approve")]
@@ -268,30 +315,46 @@ namespace SiamInternalApi.Controllers
                 .FirstOrDefaultAsync(l => l.Id == id);
 
             if (letter == null) return NotFound("Letter not found");
-            if (letter.StatusId != 1) return BadRequest("Only pending letters can be approved");
+
+            // Chỉ cho phép thay đổi nếu đơn đang pending hoặc đã được duyệt/từ chối
+            if (letter.StatusId != 1 && letter.StatusId != 3 && letter.StatusId != 4)
+                return BadRequest("Only pending or decided letters can be changed");
 
             bool canApprove = false;
 
             if (groupId == 1 || groupId == 2)
             {
-                // Admin/Manager → luôn có quyền duyệt
-                canApprove = true;
+                canApprove = true; // Admin/Manager luôn có quyền
             }
             else
             {
-                // Kiểm tra leader có nằm trong approver1/2/3 của nhân viên tạo đơn
                 var config = await _context.EmployeeConfigs
                     .FirstOrDefaultAsync(ec => ec.EmployeeId == letter.CreatorId);
 
                 if (config != null)
                 {
-                    if (config.Approved1Id == employeeId ||
-                        config.Approved2Id == employeeId ||
-                        config.Approved3Id == employeeId)
-                    {
+                    // Không cho phép cùng một người thay đổi quyết định của chính mình
+                    if (letter.ApproverId == employeeId)
+                        return Forbid("You cannot change your own decision");
+
+                    // Leader cấp 1: duyệt khi pending
+                    if (config.Approved1Id == employeeId && letter.ApproverId == 0)
                         canApprove = true;
-                    }
+
+                    // Leader cấp 2: duyệt khi pending hoặc thay đổi quyết định của cấp 1
+                    if (config.Approved2Id == employeeId &&
+                        (letter.ApproverId == 0 || letter.ApproverId == config.Approved1Id))
+                        canApprove = true;
+
+                    // Leader cấp 3: duyệt khi pending hoặc thay đổi quyết định của cấp 1 và 2
+                    if (config.Approved3Id == employeeId &&
+                        (letter.ApproverId == 0 ||
+                        letter.ApproverId == config.Approved1Id ||
+                        letter.ApproverId == config.Approved2Id))
+                        canApprove = true;
                 }
+
+
             }
 
             if (!canApprove)
@@ -307,7 +370,6 @@ namespace SiamInternalApi.Controllers
             return Ok(new { message = "Letter approved successfully", id = letter.Id, code = letter.Code });
         }
 
-
         [HttpPut("{id}/reject")]
         [Authorize]
         public async Task<IActionResult> RejectLetter(int id)
@@ -320,7 +382,9 @@ namespace SiamInternalApi.Controllers
                 .FirstOrDefaultAsync(l => l.Id == id);
 
             if (letter == null) return NotFound("Letter not found");
-            if (letter.StatusId != 1) return BadRequest("Only pending letters can be rejected");
+
+            if (letter.StatusId != 1 && letter.StatusId != 3 && letter.StatusId != 4)
+                return BadRequest("Only pending or decided letters can be changed");
 
             bool canReject = false;
 
@@ -335,13 +399,28 @@ namespace SiamInternalApi.Controllers
 
                 if (config != null)
                 {
-                    if (config.Approved1Id == employeeId ||
-                        config.Approved2Id == employeeId ||
-                        config.Approved3Id == employeeId)
-                    {
+                    // Không cho phép cùng một người thay đổi quyết định của chính mình
+                    if (letter.ApproverId == employeeId)
+                        return Forbid("You cannot change your own decision");
+
+                    // Leader cấp 1: duyệt khi pending
+                    if (config.Approved1Id == employeeId && letter.ApproverId == 0)
                         canReject = true;
-                    }
+
+                    // Leader cấp 2: duyệt khi pending hoặc thay đổi quyết định của cấp 1
+                    if (config.Approved2Id == employeeId &&
+                        (letter.ApproverId == 0 || letter.ApproverId == config.Approved1Id))
+                        canReject = true;
+
+                    // Leader cấp 3: duyệt khi pending hoặc thay đổi quyết định của cấp 1 và 2
+                    if (config.Approved3Id == employeeId &&
+                        (letter.ApproverId == 0 ||
+                        letter.ApproverId == config.Approved1Id ||
+                        letter.ApproverId == config.Approved2Id))
+                        canReject = true;
                 }
+
+
             }
 
             if (!canReject)
@@ -355,6 +434,7 @@ namespace SiamInternalApi.Controllers
 
             return Ok(new { message = "Letter rejected successfully", id = letter.Id, code = letter.Code });
         }
+
 
 
         [HttpGet("export")]

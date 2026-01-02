@@ -105,63 +105,76 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
     }
   }
 
+  void _showDialog(String title, String message, {VoidCallback? onOk}) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: Colors.indigo.shade50,
+        title: Row(
+          children: [
+            const Icon(Icons.info, color: Colors.indigo),
+            const SizedBox(width: 8),
+            Text(title,
+                style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.indigo)),
+          ],
+        ),
+        content: Text(message,
+            style: const TextStyle(fontSize: 16, color: Colors.black87)),
+        actionsAlignment: MainAxisAlignment.end,
+        actions: [
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.indigo,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            ),
+            icon: const Icon(Icons.check, color: Colors.white),
+            label: const Text("OK",
+                style: TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.bold)),
+            onPressed: () {
+              Navigator.pop(context);
+              if (onOk != null) onOk();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
     final today = DateTime.now();
     if (_startDate.isBefore(today) || _endDate.isBefore(today)) {
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text("Thông báo"),
-          content: const Text("Ngày đã qua không thể chọn để tạo đơn nghỉ."),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("OK"),
-            ),
-          ],
-        ),
-      );
+      _showDialog("Thông báo", "Ngày đã qua không thể chọn để tạo đơn nghỉ !");
       return;
     }
 
     if (_startDate != _endDate &&
         (_selectedOffType == "Morning" || _selectedOffType == "Afternoon")) {
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text("Thông báo"),
-          content: const Text(
-              "Không thể tạo đơn buổi sáng/chiều cho nhiều ngày liên tiếp. Vui lòng chọn 'Cả ngày'."),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("OK"),
-            ),
-          ],
-        ),
-      );
+      _showDialog("Thông báo",
+          "Không thể tạo đơn buổi sáng/chiều cho nhiều ngày liên tiếp. Vui lòng chọn 'Cả ngày'.");
       return;
     }
-
-    if (_selectedDayOffTypeId == null) {
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text("Thông báo"),
-          content: const Text("Vui lòng chọn loại ngày nghỉ"),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("OK"),
-            ),
-          ],
-        ),
-      );
-      return;
+    if (_selectedDayOffTypeId == 1 && _remainingDays != null) {
+      double totalDays;
+      if (_selectedOffType == "Morning" || _selectedOffType == "Afternoon") {
+        totalDays = 0.5;
+      } else {
+        totalDays = _endDate.difference(_startDate).inDays + 1;
+      }
+      if (_remainingDays! < totalDays) {
+        _showDialog("Thông báo",
+            "Bạn không đủ ngày phép để tạo đơn này. Ngày phép còn lại: $_remainingDays");
+        return;
+      }
     }
-
     setState(() => _submitting = true);
 
     try {
@@ -214,16 +227,52 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text("Thông báo"),
-            content: const Text("Bạn đã tạo đơn nghỉ thành công"),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  Navigator.pop(context);
-                },
-                child: const Text("OK"),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            backgroundColor: Colors.indigo.shade50,
+            title: Row(
+              children: const [
+                Icon(Icons.info, color: Colors.indigo),
+                SizedBox(width: 8),
+                Text(
+                  "Thông báo",
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.indigo,
+                  ),
+                ),
+              ],
+            ),
+            content: const Text(
+              "Bạn đã tạo đơn nghỉ thành công",
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.black87,
               ),
+            ),
+            actionsAlignment: MainAxisAlignment.end,
+            actions: [
+              ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.indigo,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 10),
+                  ),
+                  icon: const Icon(Icons.check, color: Colors.white),
+                  label: const Text(
+                    "OK",
+                    style: TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                  onPressed: () => {
+                        Navigator.pop(context),
+                        Navigator.pop(context),
+                      }),
             ],
           ),
         );

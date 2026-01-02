@@ -238,6 +238,10 @@ class _LeaveRequestDetailScreenState extends State<LeaveRequestDetailScreen> {
                                       Icons.calendar_today,
                                       'Ngày kết thúc',
                                       _formatDate(request!['toDate'])),
+                                  _buildRow(Icons.calendar_view_day,
+                                      'Số ngày nghỉ', request!['daysOff']),
+                                  _buildRow(Icons.people, 'Người thay thế',
+                                      request!['replacePerson']),
                                   _buildRow(
                                       Icons.notes, 'Lý do', request!['reason']),
                                   const SizedBox(height: 12),
@@ -354,6 +358,81 @@ class _LeaveRequestDetailScreenState extends State<LeaveRequestDetailScreen> {
                                         SizedBox(width: 8),
                                         Text(
                                           'Không duyệt đơn',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          // Nếu đơn đã duyệt hoặc từ chối và user có quyền thay đổi quyết định
+                          if ((request!['statusId'] == 3 ||
+                                  request!['statusId'] == 4) &&
+                              request!['canApprove'] == true &&
+                              groupId != 1 &&
+                              groupId != 2)
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: ElevatedButton(
+                                    onPressed: () {
+                                      _callAction('approve');
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.green,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      elevation: 4,
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 16),
+                                    ),
+                                    child: const Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.check, color: Colors.white),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          'Thay đổi thành DUYỆT',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: ElevatedButton(
+                                    onPressed: () {
+                                      _callAction('reject');
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.red,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      elevation: 4,
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 16),
+                                    ),
+                                    child: const Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.close, color: Colors.white),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          'Thay đổi thành KHÔNG DUYỆT',
                                           style: TextStyle(
                                             color: Colors.white,
                                             fontSize: 16,
