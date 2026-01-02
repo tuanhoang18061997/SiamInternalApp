@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:shared_preferences/shared_preferences.dart'; // 👉 thêm import này
+import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/auth_provider.dart';
 import '../../domain/entities/login_response.dart';
 import '/presentation/providers/theme_provider.dart';
+import '/presentation/utils/language.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -67,7 +68,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Login successful! Welcome ${next.value!.displayName}',
+              '${lang('login_success', 'Đăng nhập thành công')} :  ${next.value!.displayName}',
             ),
             backgroundColor: Colors.green,
           ),
@@ -79,8 +80,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Login Account',
+        title: Text(
+          lang('login_account', 'Đăng nhập tài khoản'),
           style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.bold,
@@ -95,6 +96,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.language),
+            tooltip: 'Language',
+            onPressed: () {
+              setState(() {
+                currentLanguage = currentLanguage == "vi" ? "en" : "vi";
+              });
+            },
+          ),
           Consumer(
             builder: (context, ref, _) {
               final mode = ref.watch(themeModeProvider);
@@ -155,14 +165,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   const SizedBox(height: 48),
                   TextFormField(
                     controller: _usernameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Username',
+                    decoration: InputDecoration(
+                      labelText: lang('username', 'Tên tài khoản'),
                       prefixIcon: Icon(Icons.person),
                       border: OutlineInputBorder(),
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Please enter your username';
+                        return lang(
+                            'enter_username', 'Vui lòng điền tên tài khoản');
                       }
                       return null;
                     },
@@ -170,15 +181,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _passwordController,
-                    decoration: const InputDecoration(
-                      labelText: 'Password',
+                    decoration: InputDecoration(
+                      labelText: lang('password', 'Mật khẩu'),
                       prefixIcon: Icon(Icons.lock),
                       border: OutlineInputBorder(),
                     ),
                     obscureText: true,
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Please enter your password';
+                        return lang('enter_password', 'Vui lòng điền mật khẩu');
                       }
                       return null;
                     },
@@ -195,7 +206,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             width: 20,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Text('Login'),
+                        : Text(lang('login', 'Đăng nhập')),
                   ),
                 ],
               ),

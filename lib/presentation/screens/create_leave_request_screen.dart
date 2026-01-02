@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:siam_internal_app/presentation/utils/language.dart';
 
 class CreateLeaveRequestScreen extends StatefulWidget {
   const CreateLeaveRequestScreen({super.key});
@@ -152,14 +153,19 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
 
     final today = DateTime.now();
     if (_startDate.isBefore(today) || _endDate.isBefore(today)) {
-      _showDialog("Thông báo", "Ngày đã qua không thể chọn để tạo đơn nghỉ !");
+      _showDialog(
+          lang('notification', 'Thông báo'),
+          lang(
+              'past_date_error', 'Ngày đã qua không thể chọn để tạo đơn nghỉ'));
       return;
     }
 
     if (_startDate != _endDate &&
         (_selectedOffType == "Morning" || _selectedOffType == "Afternoon")) {
-      _showDialog("Thông báo",
-          "Không thể tạo đơn buổi sáng/chiều cho nhiều ngày liên tiếp. Vui lòng chọn 'Cả ngày'.");
+      _showDialog(
+          lang('notification', 'Thông báo'),
+          lang('cannot_create_session',
+              'Không thể tạo đơn buổi sáng/chiều cho nhiều ngày liên tiếp. Vui lòng chọn Cả ngày'));
       return;
     }
     if (_selectedDayOffTypeId == 1 && _remainingDays != null) {
@@ -170,8 +176,8 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
         totalDays = _endDate.difference(_startDate).inDays + 1;
       }
       if (_remainingDays! < totalDays) {
-        _showDialog("Thông báo",
-            "Bạn không đủ ngày phép để tạo đơn này. Ngày phép còn lại: $_remainingDays");
+        _showDialog(lang('notification', 'Thông báo'),
+            '${lang('not_enough_days', 'Bạn không đủ ngày phép để tạo đơn này. Ngày phép còn lại')}: $_remainingDays');
         return;
       }
     }
@@ -232,11 +238,11 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
             ),
             backgroundColor: Colors.indigo.shade50,
             title: Row(
-              children: const [
+              children: [
                 Icon(Icons.info, color: Colors.indigo),
                 SizedBox(width: 8),
                 Text(
-                  "Thông báo",
+                  lang('notification', 'Thông báo'),
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -245,8 +251,8 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
                 ),
               ],
             ),
-            content: const Text(
-              "Bạn đã tạo đơn nghỉ thành công",
+            content: Text(
+              lang('create_success', 'Bạn đã tạo đơn nghỉ thành công'),
               style: TextStyle(
                 fontSize: 16,
                 color: Colors.black87,
@@ -288,7 +294,7 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text("Thông báo"),
+            title: Text(lang('notification', 'Thông báo')),
             content: Text(message),
             actions: [
               TextButton(
@@ -303,7 +309,7 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text("Thông báo"),
+          title: Text(lang('notification', 'Thông báo')),
           content: Text("Unexpected error: $e"),
           actions: [
             TextButton(
@@ -326,7 +332,7 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Tạo đơn nghỉ phép',
+        title: Text(lang('create_leave_request', 'Tạo đơn nghỉ phép'),
             style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.bold,
@@ -360,7 +366,7 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
               padding: const EdgeInsets.only(right: 16),
               child: Center(
                 child: Text(
-                  "Ngày phép còn lại : $_remainingDays ngày",
+                  '${lang('remaining_days', 'Ngày phép còn lại')}: $_remainingDays ',
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.bold,
@@ -388,7 +394,7 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
                       const Icon(Icons.event_note, color: Colors.indigo),
                       const SizedBox(width: 8),
                       Text(
-                        "Thông tin đơn nghỉ",
+                        lang('leave_request_detail', 'Thông tin đơn nghỉ'),
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w700,
                         ),
@@ -401,20 +407,26 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
                   DropdownButtonFormField<String>(
                     value: _selectedOffType,
                     items: [
-                      const DropdownMenuItem(
-                          value: null, child: Text("Vui lòng chọn buổi nghỉ")),
-                      const DropdownMenuItem(
-                          value: "Full Day", child: Text("Cả ngày")),
-                      const DropdownMenuItem(
-                          value: "Morning", child: Text("Buổi sáng")),
-                      const DropdownMenuItem(
-                          value: "Afternoon", child: Text("Buổi chiều")),
+                      DropdownMenuItem(
+                          value: null,
+                          child: Text(lang(
+                              'select_session', 'Vui lòng chọn buổi nghỉ'))),
+                      DropdownMenuItem(
+                          value: "Full Day",
+                          child: Text(lang('full_day', 'Cả ngày'))),
+                      DropdownMenuItem(
+                          value: "Morning",
+                          child: Text(lang('morning', 'Buổi sáng'))),
+                      DropdownMenuItem(
+                          value: "Afternoon",
+                          child: Text(lang('afternoon', 'Buổi chiều'))),
                     ],
                     onChanged: (val) => setState(() => _selectedOffType = val),
-                    validator: (v) =>
-                        v == null ? "Vui lòng chọn buổi nghỉ" : null,
-                    decoration: const InputDecoration(
-                      labelText: 'Buổi nghỉ',
+                    validator: (v) => v == null
+                        ? lang('select_session', 'Vui lòng chọn buổi nghỉ')
+                        : null,
+                    decoration: InputDecoration(
+                      labelText: lang('session', 'Buổi nghỉ'),
                       border: OutlineInputBorder(),
                     ),
                   ),
@@ -425,9 +437,10 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
                       ? const LinearProgressIndicator(minHeight: 4)
                       : DropdownButtonFormField<int>(
                           items: [
-                            const DropdownMenuItem(
+                            DropdownMenuItem(
                                 value: null,
-                                child: Text("Vui lòng chọn loại ngày nghỉ")),
+                                child: Text(lang('select_leave_type',
+                                    'Vui lòng chọn loại ngày nghỉ'))),
                             ..._dayOffTypes.map((type) {
                               return DropdownMenuItem<int>(
                                 value: type["id"],
@@ -437,10 +450,12 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
                           ],
                           onChanged: (val) =>
                               setState(() => _selectedDayOffTypeId = val),
-                          validator: (v) =>
-                              v == null ? "Vui lòng chọn loại ngày nghỉ" : null,
-                          decoration: const InputDecoration(
-                            labelText: 'Loại ngày nghỉ',
+                          validator: (v) => v == null
+                              ? lang('select_leave_type',
+                                  'Vui lòng chọn loại ngày nghỉ')
+                              : null,
+                          decoration: InputDecoration(
+                            labelText: lang('leave_type', 'Loại ngày nghỉ'),
                             border: OutlineInputBorder(),
                           ),
                         ),
@@ -454,7 +469,7 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
                           onTap: () => _pickDate(isStart: true),
                           child: InputDecorator(
                             decoration: InputDecoration(
-                              labelText: 'Ngày bắt đầu',
+                              labelText: lang('start_date', 'Ngày bắt đầu'),
                               prefixIcon: const Icon(Icons.calendar_today,
                                   color: Colors.indigo),
                               border: OutlineInputBorder(
@@ -471,7 +486,7 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
                           onTap: () => _pickDate(isStart: false),
                           child: InputDecorator(
                             decoration: InputDecoration(
-                              labelText: 'Ngày kết thúc',
+                              labelText: lang('end_date', 'Ngày kết thúc'),
                               prefixIcon: const Icon(Icons.calendar_today,
                                   color: Colors.indigo),
                               border: OutlineInputBorder(
@@ -489,15 +504,15 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
                   TextFormField(
                     controller: _reasonController,
                     decoration: InputDecoration(
-                      labelText: 'Lý do',
-                      hintText: 'Ví dụ: Khám bệnh',
+                      labelText: lang('reason', 'Lý do'),
+                      hintText: lang('reason_hint', 'Ví dụ: Khám bệnh'),
                       prefixIcon: const Icon(Icons.notes, color: Colors.indigo),
                       border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12)),
                     ),
                     maxLines: 3,
                     validator: (v) => v == null || v.trim().isEmpty
-                        ? "Vui lòng nhập lý do xin nghỉ"
+                        ? lang('enter_reason', 'Vui lòng nhập lý do xin nghỉ')
                         : null,
                   ),
                   const SizedBox(height: 16),
@@ -506,8 +521,8 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
                   TextFormField(
                     controller: _replaceController,
                     decoration: InputDecoration(
-                      labelText: 'Người bàn giao',
-                      hintText: 'Tên người bàn giao',
+                      labelText: lang('handover', 'Người bàn giao'),
+                      hintText: lang('handover_hint', 'Tên người bàn giao'),
                       prefixIcon: const Icon(Icons.person_outline,
                           color: Colors.indigo),
                       border: OutlineInputBorder(
@@ -530,7 +545,9 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
                             )
                           : const Icon(Icons.send),
                       label: Text(
-                        _submitting ? "Submitting..." : "Gửi đơn nghỉ",
+                        _submitting
+                            ? lang('submitting', 'Đang gửi...')
+                            : lang('submit_leave', 'Gửi đơn nghỉ'),
                         style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,

@@ -5,6 +5,7 @@ import '../../data/datasources/auth_remote_datasource.dart';
 import '../../data/repositories/auth_repository_impl.dart';
 import '../../core/network/dio_client.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '/presentation/utils/language.dart';
 
 final authTokenProvider = StateProvider<String?>((ref) => null);
 
@@ -27,7 +28,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<LoginResponse?>> {
       } else {
         // Sai tài khoản hoặc mật khẩu → chỉ set error string
         state = AsyncValue.error(
-          'Sai tài khoản hoặc mật khẩu',
+          lang('login_failed', 'Sai tài khoản hoặc mật khẩu'),
           StackTrace.current,
         );
       }

@@ -11,6 +11,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:open_file/open_file.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:html' as html;
+import '/presentation/utils/language.dart';
 
 class LeaveRequest {
   LeaveRequest({
@@ -20,10 +21,15 @@ class LeaveRequest {
     required this.startDate,
     required this.endDate,
     required this.reason,
-    required this.status,
+    required this.statusId,
   });
 
   factory LeaveRequest.fromJson(Map<String, dynamic> json) {
+    final rawStatusId = json['statusId'];
+    final statusId = rawStatusId is int
+        ? rawStatusId
+        : int.tryParse(rawStatusId?.toString() ?? '') ?? 0;
+
     return LeaveRequest(
       id: json['id'] is int ? json['id'] : int.parse(json['id'].toString()),
       employeeName: json['creatorName']?.toString() ?? '',
@@ -31,7 +37,7 @@ class LeaveRequest {
       startDate: _parseDate(json['fromDate']),
       endDate: _parseDate(json['toDate']),
       reason: json['reason']?.toString() ?? '',
-      status: _mapStatus(json['statusId']),
+      statusId: statusId,
     );
   }
   final int id;
@@ -40,19 +46,16 @@ class LeaveRequest {
   final DateTime startDate;
   final DateTime endDate;
   final String reason;
-  final String status;
+  final int statusId;
 
-  static String _mapStatus(dynamic statusIdRaw) {
-    final int? statusId = statusIdRaw is int
-        ? statusIdRaw
-        : int.tryParse(statusIdRaw?.toString() ?? '');
+  String get statusText {
     switch (statusId) {
       case 1:
-        return 'Đang chờ duyệt';
+        return lang('status_pending', 'Đang chờ duyệt');
       case 3:
-        return 'Đã duyệt';
+        return lang('status_approved', 'Đã duyệt');
       case 4:
-        return 'Không duyệt';
+        return lang('status_rejected', 'Không duyệt');
       default:
         return '';
     }
@@ -125,7 +128,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Export thành công (Web)")),
+            const SnackBar(content: Text("Export thành công")),
           );
         }
       } else {
@@ -138,8 +141,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content:
-                  Text("Export thành công: LeaveReport_${year}_${month}.csv"),
+              content: Text(
+                  '${lang('export_success', 'Export thành công')}: ${year}_${month}.csv'),
               backgroundColor: Colors.green,
             ),
           );
@@ -149,7 +152,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("Export thất bại: ${res.statusCode}"),
+            content: Text(
+                '${lang('export_failed', 'Export thất bại')}: ${res.statusCode}'),
             backgroundColor: Colors.red,
           ),
         );
@@ -213,7 +217,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         final newItems = data
             .whereType<Map<String, dynamic>>()
             .map((e) => LeaveRequest.fromJson(e))
-            .where((r) => r.status != 'canceled') // bỏ canceled
+            .where((r) => r.statusId != 0)
             .toList();
 
         setState(() => _all = newItems);
@@ -240,14 +244,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 r.leaveType.toLowerCase().contains(q);
           }).toList();
 
-    final pending =
-        filtered.where((r) => r.status == 'Đang chờ duyệt').toList();
-    final approved = filtered.where((r) => r.status == 'Đã duyệt').toList();
-    final rejected = filtered.where((r) => r.status == 'Không duyệt').toList();
+    final pending = filtered.where((r) => r.statusId == 1).toList();
+    final approved = filtered.where((r) => r.statusId == 3).toList();
+    final rejected = filtered.where((r) => r.statusId == 4).toList();
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Danh sách đơn',
+        title: Text(lang('title_list', 'Danh sách đơn'),
             style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.bold,
@@ -262,10 +265,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             )),
         bottom: TabBar(
           controller: _tabController,
-          tabs: const [
-            Tab(text: 'Đang chờ duyệt'),
-            Tab(text: 'Đã duyệt'),
-            Tab(text: 'Không duyệt'),
+          tabs: [
+            Tab(text: lang('status_pending', 'Đang chờ duyệt')),
+            Tab(text: lang('status_approved', 'Đã duyệt')),
+            Tab(text: lang('status_rejected', 'Không duyệt')),
           ],
         ),
         actions: [
@@ -280,128 +283,144 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               });
             },
           ),
-          if (_groupId == 1 || _groupId == 2) // chỉ manager
-            IconButton(
-              icon: const Icon(Icons.download),
-              tooltip: "Export Report",
-              onPressed: () async {
-                final now = DateTime.now();
-                int selectedMonth = now.month;
-                int selectedYear = now.year;
-
-                await showDialog(
-                  context: context,
-                  builder: (context) {
-                    return StatefulBuilder(
-                      builder: (context, setState) {
-                        return AlertDialog(
-                          title: const Text("Export Report"),
-                          content: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                            children: [
-                              // Dropdown chọn tháng
-                              DropdownButton<int>(
-                                value: selectedMonth,
-                                items: List.generate(12, (i) {
-                                  final month = i + 1;
-                                  return DropdownMenuItem(
-                                    value: month,
-                                    child: Text("Tháng $month"),
-                                  );
-                                }),
-                                onChanged: (val) {
-                                  if (val != null) {
-                                    setState(() => selectedMonth = val);
-                                  }
-                                },
-                              ),
-                              // Dropdown chọn năm
-                              DropdownButton<int>(
-                                value: selectedYear,
-                                items: List.generate(5, (i) {
-                                  final year = now.year - 2 + i;
-                                  return DropdownMenuItem(
-                                    value: year,
-                                    child: Text("Năm $year"),
-                                  );
-                                }),
-                                onChanged: (val) {
-                                  if (val != null) {
-                                    setState(() => selectedYear = val);
-                                  }
-                                },
-                              ),
-                            ],
-                          ),
-                          actions: [
-                            TextButton(
-                              child: const Text("Hủy"),
-                              onPressed: () => Navigator.pop(context),
-                            ),
-                            ElevatedButton(
-                              child: const Text("Export"),
-                              onPressed: () async {
-                                Navigator.pop(context);
-                                await _exportReport(
-                                    selectedYear, selectedMonth);
-                              },
-                            ),
-                          ],
-                        );
-                      },
-                    );
-                  },
-                );
-              },
-            ),
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadData),
-          Consumer(
-            builder: (context, ref, _) {
-              final mode = ref.watch(themeModeProvider);
-              return IconButton(
-                icon: Icon(
-                  mode == ThemeMode.dark ? Icons.light_mode : Icons.dark_mode,
-                ),
-                onPressed: () {
-                  final notifier = ref.read(themeModeProvider.notifier);
-                  notifier.state =
-                      mode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
-                },
-              );
+          IconButton(
+            icon: const Icon(Icons.language),
+            tooltip: 'Language',
+            onPressed: () {
+              setState(() {
+                currentLanguage = currentLanguage == "vi" ? "en" : "vi";
+              });
             },
           ),
           PopupMenuButton<String>(
             onSelected: (value) async {
-              if (value == 'logout') {
-                await ref.read(authProvider.notifier).logout();
-                if (!mounted) return;
-                GoRouter.of(context).refresh();
-                context.go('/');
+              switch (value) {
+                case 'export':
+                  final now = DateTime.now();
+                  int selectedMonth = now.month;
+                  int selectedYear = now.year;
+                  await showDialog(
+                    context: context,
+                    builder: (context) {
+                      return StatefulBuilder(
+                        builder: (context, setState) {
+                          return AlertDialog(
+                            title:
+                                Text(lang('export_report', 'Xuất danh sách ')),
+                            content: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                              children: [
+                                DropdownButton<int>(
+                                  value: selectedMonth,
+                                  items: List.generate(12, (i) {
+                                    final month = i + 1;
+                                    return DropdownMenuItem(
+                                      value: month,
+                                      child: Text(
+                                          '${lang('month', 'Tháng')} $month'),
+                                    );
+                                  }),
+                                  onChanged: (val) {
+                                    if (val != null) {
+                                      setState(() => selectedMonth = val);
+                                    }
+                                  },
+                                ),
+                                DropdownButton<int>(
+                                  value: selectedYear,
+                                  items: List.generate(5, (i) {
+                                    final year = now.year - 2 + i;
+                                    return DropdownMenuItem(
+                                      value: year,
+                                      child:
+                                          Text('${lang('year', 'Năm')} $year'),
+                                    );
+                                  }),
+                                  onChanged: (val) {
+                                    if (val != null) {
+                                      setState(() => selectedYear = val);
+                                    }
+                                  },
+                                ),
+                              ],
+                            ),
+                            actions: [
+                              TextButton(
+                                child: Text(lang('cancel', 'Hủy')),
+                                onPressed: () => Navigator.pop(context),
+                              ),
+                              ElevatedButton(
+                                child: Text(
+                                    lang('export_report', 'Xuất danh sách ')),
+                                onPressed: () async {
+                                  Navigator.pop(context);
+                                  await _exportReport(
+                                      selectedYear, selectedMonth);
+                                },
+                              ),
+                            ],
+                          );
+                        },
+                      );
+                    },
+                  );
+                  break;
+                case 'refresh':
+                  _loadData();
+                  break;
+                case 'theme':
+                  final mode = ref.read(themeModeProvider);
+                  final notifier = ref.read(themeModeProvider.notifier);
+                  notifier.state =
+                      mode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
+                  break;
+                case 'logout':
+                  await ref.read(authProvider.notifier).logout();
+                  if (!mounted) return;
+                  GoRouter.of(context).refresh();
+                  context.go('/');
+                  break;
               }
             },
             itemBuilder: (context) => [
               PopupMenuItem(
                 value: 'profile',
-                child: Row(
-                  children: [
-                    const Icon(Icons.person),
-                    const SizedBox(width: 8),
-                    Text(_displayName ?? 'User'),
-                  ],
+                child: ListTile(
+                  leading: const Icon(Icons.person),
+                  title: Text('$_displayName'),
                 ),
               ),
-              const PopupMenuItem(
+              if (_groupId == 1 || _groupId == 2)
+                PopupMenuItem(
+                  value: 'export',
+                  child: ListTile(
+                    leading: const Icon(Icons.download),
+                    title: Text(lang('export_report', 'Xuất danh sách')),
+                  ),
+                ),
+              PopupMenuItem(
+                value: 'refresh',
+                child: ListTile(
+                  leading: Icon(Icons.refresh),
+                  title: Text(lang('refresh', 'Làm mới')),
+                ),
+              ),
+              PopupMenuItem(
+                value: 'theme',
+                child: ListTile(
+                  leading: Icon(Icons.brightness_6),
+                  title: Text(lang('theme', 'Sáng/tối')),
+                ),
+              ),
+              PopupMenuItem(
                 value: 'logout',
-                child: Row(
-                  children: [
-                    Icon(Icons.logout),
-                    SizedBox(width: 8),
-                    Text('Đăng xuất'),
-                  ],
+                child: ListTile(
+                  leading: const Icon(Icons.logout),
+                  title: const Text('Logout'),
                 ),
               ),
             ],
-          )
+          ),
         ],
       ),
       body: Column(
@@ -412,9 +431,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               padding: const EdgeInsets.all(8.0),
               child: TextField(
                 autofocus: true,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   prefixIcon: Icon(Icons.search),
-                  hintText: 'Tìm theo tên, lý do hoặc loại nghỉ...',
+                  hintText: lang(
+                      'search_hint', 'Tìm theo tên, lý do hoặc loại nghỉ...'),
                   border: OutlineInputBorder(),
                 ),
                 onChanged: (value) {
@@ -434,7 +454,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             child: _initialLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _error != null
-                    ? Center(child: Text('Lỗi: $_error'))
+                    ? Center(child: Text('${lang('error', 'Lỗi')}: $_error'))
                     : TabBarView(
                         controller: _tabController,
                         children: [
@@ -449,23 +469,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.push('/create-leave-request'),
         icon: const Icon(Icons.add),
-        label: const Text('Tạo đơn mới'),
+        label: Text(lang('create_new', 'Tạo đơn mới')),
       ),
     );
   }
 
   Widget _buildList(List<LeaveRequest> requests) {
     return requests.isEmpty
-        ? const Center(child: Text('Không có dữ liệu'))
+        ? Center(child: Text(lang('no_data', 'Không có dữ liệu')))
         : ListView.builder(
             padding: const EdgeInsets.all(16),
             controller: _scrollController,
             itemCount: requests.length,
             itemBuilder: (context, index) {
               final request = requests[index];
-              final statusColor = switch (request.status) {
-                'Đã duyệt' => Colors.green,
-                'Không duyệt' => Colors.red,
+
+              // Lấy chuỗi trạng thái
+              final statusColor = switch (request.statusId) {
+                3 => Colors.green,
+                4 => Colors.red,
                 _ => Colors.orange,
               };
 
@@ -489,10 +511,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                               ),
                             ),
                             Chip(
-                              label: Text(request.status.toUpperCase()),
+                              label: Text(request.statusText.toUpperCase()),
                               backgroundColor: statusColor.withOpacity(0.2),
                               labelStyle: TextStyle(color: statusColor),
-                            ),
+                            )
                           ],
                         ),
                         const SizedBox(height: 8),

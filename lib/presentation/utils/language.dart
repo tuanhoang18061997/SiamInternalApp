@@ -1,0 +1,76 @@
+import 'dart:core';
+
+Map<String, String> _vi = {};
+Map<String, String> _en = {
+  'title_list': 'Leave requests',
+  'search_hint': 'Search by name, reason, or leave type...',
+  'create_new': 'Create new',
+  'no_data': 'No data',
+  'approve_request': 'Approve',
+  'reject_request': 'Reject',
+  'status': 'Status',
+  'update': 'Update',
+  'update_success': 'Update Success',
+  'update_status': 'Update Status',
+  'change_to_approved': 'Change to APPROVED',
+  'change_to_rejected': 'Change to REJECTED',
+  'export_report': 'Export Report',
+  'refresh': 'Refresh',
+  'status_pending': 'Pending',
+  'status_approved': 'Approved',
+  'status_rejected': 'Rejected',
+  'export_success': 'Export successful',
+  'export_failed': 'Export failed',
+  'logout': 'Logout',
+  'profile': 'Profile',
+  'language': 'Language',
+  'theme': 'Toggle Theme',
+  'cancel': 'Cancel',
+  'month': 'Month',
+  'year': 'Year',
+  'error': 'Error',
+  'login_account': 'Login Account',
+  'enter_username': 'Please enter your username',
+  'username': 'Username',
+  'login': 'Login',
+  'password': 'Password',
+  'enter_password': 'Please enter your password',
+  'login_success': 'Login successful',
+  'login_failed': 'Login failed',
+  'notification': 'Notification',
+  'cannot_create_session':
+      'Cannot create morning/afternoon requests for consecutive days. Please select Full day',
+  'past_date_error': 'Past dates cannot be selected to create a leave request',
+  'not_enough_days':
+      'You do not have enough leave days to create this request. Remaining leave days',
+  'create_leave_request': 'Create Leave Request',
+  'create_success': 'You have successfully created a leave request',
+  'remaining_days': 'Remaining leave days',
+  'leave_request_detail': 'Leave request detail',
+  'select_session': 'Please select a leave session',
+  'select_leave_type': 'Please select a leave type',
+  'enter_reason': 'Please enter a reason for leave',
+  'full_day': 'Full day',
+  'morning': 'Morning',
+  'afternoon': 'Afternoon',
+  'session': 'Leave session',
+  'leave_type': 'Leave type',
+  'reason': 'Reason',
+  'reason_hint': 'Example: Medical checkup',
+  'replace': 'Replace person',
+  'replace_hint': 'Name of replace person',
+  'submitting': 'Submitting...',
+  'submit_leave': 'Submit leave request',
+  'start_date': 'Start date',
+  'end_date': 'End date',
+  'code': 'Code',
+  'employee_name': 'Employee Name',
+  'dayoff': 'Day offs',
+};
+
+String currentLanguage = "vi";
+
+String lang(String key, String defaultString) {
+  if (currentLanguage == "en") return _en[key] ?? defaultString;
+  return _vi[key] ?? defaultString;
+}
