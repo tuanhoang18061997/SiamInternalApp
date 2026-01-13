@@ -30,9 +30,56 @@ namespace SiamInternalApi.Data
             modelBuilder.Entity<User>(entity =>
             {
                 entity.HasOne(u => u.Employee)
-                      .WithMany(e => e.Users)
-                      .HasForeignKey(u => u.EmployeeId)
+                      .WithOne(e => e.Users)
+                      .HasForeignKey<User>(u => u.EmployeeId)
                       .OnDelete(DeleteBehavior.Restrict);
+            });
+            // Employee ↔ Profile
+            modelBuilder.Entity<Employee>(entity => 
+            { 
+                entity.HasOne(e => e.Profile) 
+                    .WithOne(p => p.Employee) 
+                    .HasForeignKey<Profile>(p => p.EmployeeId) 
+                    .OnDelete(DeleteBehavior.Restrict); 
+
+                entity.HasOne(e => e.Ethnic)
+                    .WithMany(et => et.Employees)
+                    .HasForeignKey(e => e.EthnicId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(e => e.Religion)
+                    .WithMany(r => r.Employees)
+                    .HasForeignKey(e => e.ReligionId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(e => e.Country)
+                    .WithMany(c => c.Employees)
+                    .HasForeignKey(e => e.CountryId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+            }); 
+            // Profile ↔ Department, Position, Block, Branch
+            modelBuilder.Entity<Profile>(entity => 
+            {   
+                entity.HasOne(p => p.Department) 
+                    .WithMany(d => d.Profiles) 
+                    .HasForeignKey(p => p.DepartmentId) 
+                    .OnDelete(DeleteBehavior.Restrict); 
+
+                entity.HasOne(p => p.Position) 
+                    .WithMany(pos => pos.Profiles) 
+                    .HasForeignKey(p => p.PositionId) 
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(p => p.Block)
+                    .WithMany(b => b.Profiles)
+                    .HasForeignKey(p => p.BlockId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(p => p.Branch)
+                    .WithMany(br => br.Profiles)
+                    .HasForeignKey(p => p.BranchId)
+                    .OnDelete(DeleteBehavior.Restrict);
             });
 
             // Letter ↔ Employee, DayOffType

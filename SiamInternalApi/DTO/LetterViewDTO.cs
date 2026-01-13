@@ -3,6 +3,7 @@ namespace SiamInternalApi.DTO
     public class LetterViewDto
     {
         public int Id { get; set; }
+        public int CreatorId { get; set; }
         public string Code { get; set; } = "";
         public DateTime FromDate { get; set; }
         public DateTime ToDate { get; set; }

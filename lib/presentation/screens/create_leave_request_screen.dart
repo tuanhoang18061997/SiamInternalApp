@@ -521,8 +521,8 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
                   TextFormField(
                     controller: _replaceController,
                     decoration: InputDecoration(
-                      labelText: lang('handover', 'Người bàn giao'),
-                      hintText: lang('handover_hint', 'Tên người bàn giao'),
+                      labelText: lang('replace', 'Người bàn giao'),
+                      hintText: lang('replace_hint', 'Tên người bàn giao'),
                       prefixIcon: const Icon(Icons.person_outline,
                           color: Colors.indigo),
                       border: OutlineInputBorder(

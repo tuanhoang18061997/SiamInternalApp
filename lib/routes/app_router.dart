@@ -4,6 +4,7 @@ import '../presentation/screens/login_screen.dart';
 import '../presentation/screens/home_screen.dart';
 import '../presentation/screens/leave_request_detail_screen.dart';
 import '../presentation/screens/create_leave_request_screen.dart';
+import '../presentation/screens/profile.dart';
 import '../presentation/providers/auth_provider.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
@@ -51,6 +52,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/create-leave-request',
         builder: (context, state) => const CreateLeaveRequestScreen(),
+      ),
+      GoRoute(
+        path: '/profile',
+        builder: (context, state) => const ProfileScreen(),
       ),
     ],
   );

@@ -12,6 +12,7 @@ import 'package:open_file/open_file.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:html' as html;
 import '/presentation/utils/language.dart';
+import 'managed_letter.dart';
 
 class LeaveRequest {
   LeaveRequest({
@@ -76,7 +77,8 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen>
     with SingleTickerProviderStateMixin {
-  List<LeaveRequest> _all = [];
+  List<LeaveRequest> _myLetters = [];
+  List<LeaveRequest> _managedLetters = [];
   bool _initialLoading = true;
   String? _error;
   String _searchQuery = '';
@@ -93,6 +95,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   double? _remainingDays;
   bool _loadingBalance = true;
   int? _groupId;
+  bool _canApprove = false;
 
   static const String baseUrl = 'http://localhost:5204';
 
@@ -183,6 +186,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     setState(() {
       _displayName = prefs.getString('displayName') ?? 'User';
       _groupId = prefs.getInt('groupId');
+      _canApprove = prefs.getBool('canApprove') ?? false;
     });
   }
 
@@ -206,21 +210,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
       if (res.statusCode == 200) {
         final body = jsonDecode(res.body);
-        List<dynamic> data;
-        if (body is Map<String, dynamic>) {
-          data = (body['items'] as List?) ?? [];
-        } else if (body is List) {
-          data = body;
-        } else {
-          data = [];
-        }
-        final newItems = data
+        final myData = (body['myLetters'] as List?) ?? [];
+        final managedData = (body['managedLetters'] as List?) ?? [];
+        final myItems = myData
             .whereType<Map<String, dynamic>>()
             .map((e) => LeaveRequest.fromJson(e))
-            .where((r) => r.statusId != 0)
             .toList();
-
-        setState(() => _all = newItems);
+        final managedItems = managedData
+            .whereType<Map<String, dynamic>>()
+            .map((e) => LeaveRequest.fromJson(e))
+            .toList();
+        setState(() {
+          _myLetters = myItems;
+          _managedLetters = managedItems;
+        });
       } else {
         setState(() => _error = 'Failed: ${res.statusCode}');
       }
@@ -235,19 +238,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   @override
   Widget build(BuildContext context) {
-    final filtered = _searchQuery.isEmpty
-        ? _all
-        : _all.where((r) {
-            final q = _searchQuery.toLowerCase();
-            return r.employeeName.toLowerCase().contains(q) ||
-                r.reason.toLowerCase().contains(q) ||
-                r.leaveType.toLowerCase().contains(q);
-          }).toList();
-
-    final pending = filtered.where((r) => r.statusId == 1).toList();
-    final approved = filtered.where((r) => r.statusId == 3).toList();
-    final rejected = filtered.where((r) => r.statusId == 4).toList();
-
     return Scaffold(
       appBar: AppBar(
         title: Text(lang('title_list', 'Danh sách đơn'),
@@ -255,22 +245,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               fontSize: 22,
               fontWeight: FontWeight.bold,
               letterSpacing: 1.5,
-              shadows: [
-                Shadow(
-                  blurRadius: 4.0,
-                  color: Colors.black45,
-                  offset: Offset(2.0, 2.0),
-                ),
-              ],
             )),
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: [
-            Tab(text: lang('status_pending', 'Đang chờ duyệt')),
-            Tab(text: lang('status_approved', 'Đã duyệt')),
-            Tab(text: lang('status_rejected', 'Không duyệt')),
-          ],
-        ),
         actions: [
           IconButton(
             icon: Icon(_showSearch ? Icons.close : Icons.search),
@@ -295,6 +270,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           PopupMenuButton<String>(
             onSelected: (value) async {
               switch (value) {
+                case 'profile':
+                  context.push('/profile');
+                  break;
+                case 'managed':
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ManagedLettersScreen(
+                        managedLetters: _managedLetters,
+                      ),
+                    ),
+                  );
+                  break;
                 case 'export':
                   final now = DateTime.now();
                   int selectedMonth = now.month;
@@ -390,6 +378,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   title: Text('$_displayName'),
                 ),
               ),
+              if (_groupId == 1 || _groupId == 2 || _canApprove)
+                PopupMenuItem(
+                  value: 'managed',
+                  child: ListTile(
+                    leading: const Icon(Icons.assignment),
+                    title: Text(lang('managed_letters', 'Đơn cần duyệt')),
+                  ),
+                ),
               if (_groupId == 1 || _groupId == 2)
                 PopupMenuItem(
                   value: 'export',
@@ -425,7 +421,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       ),
       body: Column(
         children: [
-          // Thanh tìm kiếm
           if (_showSearch)
             Padding(
               padding: const EdgeInsets.all(8.0),
@@ -455,14 +450,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 ? const Center(child: CircularProgressIndicator())
                 : _error != null
                     ? Center(child: Text('${lang('error', 'Lỗi')}: $_error'))
-                    : TabBarView(
-                        controller: _tabController,
-                        children: [
-                          _buildList(pending),
-                          _buildList(approved),
-                          _buildList(rejected),
-                        ],
-                      ),
+                    : _buildStatusTabs(
+                        _myLetters), // 👉 chỉ hiển thị đơn của tôi
           ),
         ],
       ),
@@ -470,6 +459,45 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         onPressed: () => context.push('/create-leave-request'),
         icon: const Icon(Icons.add),
         label: Text(lang('create_new', 'Tạo đơn mới')),
+      ),
+    );
+  }
+
+  Widget _buildStatusTabs(List<LeaveRequest> requests) {
+    final filtered = _searchQuery.isEmpty
+        ? requests
+        : requests.where((r) {
+            final q = _searchQuery.toLowerCase();
+            return r.employeeName.toLowerCase().contains(q) ||
+                r.reason.toLowerCase().contains(q) ||
+                r.leaveType.toLowerCase().contains(q);
+          }).toList();
+
+    final pending = filtered.where((r) => r.statusId == 1).toList();
+    final approved = filtered.where((r) => r.statusId == 3).toList();
+    final rejected = filtered.where((r) => r.statusId == 4).toList();
+
+    return DefaultTabController(
+      length: 3,
+      child: Column(
+        children: [
+          TabBar(
+            tabs: [
+              Tab(text: lang('status_pending', 'Đang chờ duyệt')),
+              Tab(text: lang('status_approved', 'Đã duyệt')),
+              Tab(text: lang('status_rejected', 'Không duyệt')),
+            ],
+          ),
+          Expanded(
+            child: TabBarView(
+              children: [
+                _buildList(pending),
+                _buildList(approved),
+                _buildList(rejected),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -494,7 +522,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               return Card(
                 margin: const EdgeInsets.only(bottom: 12),
                 child: InkWell(
-                  onTap: () => context.push('/leave-request/${request.id}'),
+                  onTap: () async {
+                    final result =
+                        await context.push('/leave-request/${request.id}');
+                    if (result == true) {
+                      _loadData();
+                    }
+                  },
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(

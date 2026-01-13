@@ -21,7 +21,37 @@ namespace SiamInternalApi.Models
         [Column("approver3_id")]
         public int? Approved3Id { get; set; }
 
-        [Column("vacation_day", TypeName = "decimal(4,1)")]
+        [Column("meal_support")]
+        public byte MealSupport { get; set; }
+
+        [Column("phi_cong_doan")]
+        public byte PhiCongDoan { get; set; }
+
+        [Column("bhtn")]
+        public byte BHTN { get; set; }
+
+        [Column("on_saturday")]
+        public byte OnSaturday { get; set; }
+
+        [Column("on_sunday")]
+        public byte OnSunday { get; set; }
+
+        [Column("morning_in")]
+        public TimeSpan MorningIn { get; set; }
+
+        [Column("morning_out")]
+        public TimeSpan MorningOut { get; set; }
+
+        [Column("afternoon_in")]
+        public TimeSpan AfternoonIn { get; set; }
+
+        [Column("afternoon_out")]
+        public TimeSpan AfternoonOut  { get; set; }
+
+        [Column("work_hours")]
+        public decimal WorkHour  { get; set; }
+        
+        [Column("vacation_day")]
         public decimal VacationDay { get; set; }
 
         public Employee? Employee { get; set; }

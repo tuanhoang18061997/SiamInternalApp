@@ -65,6 +65,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         await prefs.setString('role', next.value!.role);
         await prefs.setInt('userId', next.value!.employeeId);
 
+        await prefs.setBool('canApprove', next.value!.canApprove);
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(

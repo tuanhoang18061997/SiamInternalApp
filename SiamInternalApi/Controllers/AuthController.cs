@@ -48,14 +48,32 @@ namespace SiamInternalApi.Controllers
                 expires: DateTime.Now.AddHours(2),
                 signingCredentials: creds);
 
+            // 👉 Tính toán quyền duyệt
+            bool canApprove = false;
+            if (user.GroupId == 1 || user.GroupId == 2)
+            {
+                canApprove = true;
+            }
+            else
+            {
+                var config = _context.EmployeeConfigs
+                    .FirstOrDefault(ec => ec.Approved1Id == user.EmployeeId
+                                    || ec.Approved2Id == user.EmployeeId
+                                    || ec.Approved3Id == user.EmployeeId);
+                if (config != null)
+                    canApprove = true;
+            }
+
             return Ok(new LoginResponse
             {
                 Token = new JwtSecurityTokenHandler().WriteToken(token),
                 DisplayName = user.Name,
                 Role = user.GroupId.ToString(),
-                EmployeeId = user.EmployeeId
+                EmployeeId = user.EmployeeId,
+                CanApprove = canApprove  
             });
         }
+
     }
 
     public class LoginRequest
@@ -70,5 +88,6 @@ namespace SiamInternalApi.Controllers
         public string DisplayName { get; set; } = "";
         public string Role { get; set; } = "";
         public int EmployeeId { get; set; }
+        public bool CanApprove { get; set; }
     }
 }

@@ -32,7 +32,6 @@ namespace SiamInternalApi.Models
         [Column("modified")]
         public DateTime Modified { get; set; }
 
-        // Navigation sang Employee
         public Employee? Employee { get; set; }
     }
 }

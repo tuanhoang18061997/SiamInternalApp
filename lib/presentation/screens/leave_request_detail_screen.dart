@@ -130,7 +130,8 @@ class _LeaveRequestDetailScreenState extends State<LeaveRequestDetailScreen> {
           SnackBar(
               content: Text('$action success'), backgroundColor: Colors.green),
         );
-        _loadDetail(); // reload để cập nhật trạng thái
+        _loadDetail();
+        Navigator.pop(context, true);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

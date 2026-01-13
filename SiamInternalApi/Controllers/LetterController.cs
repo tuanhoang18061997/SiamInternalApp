@@ -39,13 +39,9 @@ namespace SiamInternalApi.Controllers
                 .Include(l => l.DayOffType)
                 .AsQueryable();
 
-            if (groupId == 1 || groupId == 2)
+            if (groupId != 1 && groupId != 2)
             {
-                // Admin/Manager → xem tất cả đơn
-            }
-            else
-            {
-                // Lấy danh sách nhân viên mà current employee là approver
+                // Nếu không phải admin/manager thì chỉ lấy đơn của mình + nhân viên mình quản lý
                 var managedEmployeeIds = await _context.EmployeeConfigs
                     .Where(ec => ec.Approved1Id == employeeId
                             || ec.Approved2Id == employeeId
@@ -53,7 +49,6 @@ namespace SiamInternalApi.Controllers
                     .Select(ec => ec.EmployeeId)
                     .ToListAsync();
 
-                // Đơn của mình + đơn nhân viên mình quản lý
                 query = query.Where(l => l.CreatorId == employeeId || managedEmployeeIds.Contains(l.CreatorId));
             }
 
@@ -66,14 +61,46 @@ namespace SiamInternalApi.Controllers
                 .Where(dto => dto != null)
                 .ToList();
 
+            // 👉 Phân chia: đơn của tôi và đơn nhân viên quản lý
+            var myLetters = result.Where(dto => dto.CreatorId == employeeId).ToList();
+            var managedLetters = result.Where(dto => dto.CreatorId != employeeId).ToList();
+
             return Ok(new
             {
-                totalCount = result.Count,
-                items = result
+                myLettersCount = myLetters.Count,
+                managedLettersCount = managedLetters.Count,
+                myLetters,
+                managedLetters
             });
         }
+        
+        [HttpGet("balance")]
+        public async Task<IActionResult> GetVacationBalance()
+        {
+            try
+            {
+                var employeeIdClaim = User.Claims.FirstOrDefault(c => c.Type == "EmployeeId");
+                if (employeeIdClaim == null)
+                    return Unauthorized("EmployeeId not found in token");
 
+                int employeeId = int.Parse(employeeIdClaim.Value);
 
+                var config = await _context.EmployeeConfigs
+                    .FirstOrDefaultAsync(e => e.EmployeeId == employeeId); 
+
+                if (config == null)
+                    return NotFound("Employee not found");
+
+                return Ok(new
+                {
+                    vacationDay = config.VacationDay
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error retrieving balance", detail = ex.Message });
+            }
+        }
 
 
         [HttpGet("dayofftypes")]
@@ -202,6 +229,8 @@ namespace SiamInternalApi.Controllers
 
             if (config == null) return NotFound("Employee config not found");
 
+            if (dto.FromDate.DayOfWeek == DayOfWeek.Sunday || dto.ToDate.DayOfWeek == DayOfWeek.Sunday) 
+                return BadRequest("Không thể tạo đơn nghỉ vào Chủ Nhật.");
             //  Kiểm tra trùng ngày
             var hasOverlap = await _context.Letters.AnyAsync(l =>
                 l.CreatorId == employeeId &&
@@ -252,7 +281,12 @@ namespace SiamInternalApi.Controllers
 
             _context.Letters.Add(letter);
             await _context.SaveChangesAsync();
-
+            if (dto.DayOffTypeId == 1) 
+            { 
+                config.VacationDay -= (decimal)totalDays; 
+                _context.EmployeeConfigs.Update(config); 
+                await _context.SaveChangesAsync(); 
+            }
             // Sinh mã đơn sau khi có Id
             letter.Code = $"DXN{letter.Id.ToString().PadLeft(6, '0')}";
             await _context.SaveChangesAsync();
@@ -269,24 +303,49 @@ namespace SiamInternalApi.Controllers
             var employeeId = int.Parse(User.FindFirst("EmployeeId")!.Value);
             var groupId = int.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.Role)!.Value);
 
-            // Chỉ admin/manager mới được phép
             if (groupId != 1 && groupId != 2)
                 return Forbid("Only admins/managers can update status");
 
             var letter = await _context.Letters.FindAsync(id);
             if (letter == null) return NotFound("Letter not found");
 
+            // 👉 Nếu chuyển sang Reject thì hoàn lại ngày phép
+            if (newStatusId == 4 && letter.DayOffTypeId == 1 && letter.StatusId != 4)
+            {
+                var config = await _context.EmployeeConfigs
+                    .FirstOrDefaultAsync(ec => ec.EmployeeId == letter.CreatorId);
+
+                if (config != null)
+                {
+                    config.VacationDay += letter.DaysOff;
+                    _context.EmployeeConfigs.Update(config);
+                }
+            }
+
+            // 👉 Nếu chuyển từ Reject sang Pending/Approve thì trừ lại ngày phép
+            if ((newStatusId == 1 || newStatusId == 3) && letter.DayOffTypeId == 1 && letter.StatusId == 4)
+            {
+                var config = await _context.EmployeeConfigs
+                    .FirstOrDefaultAsync(ec => ec.EmployeeId == letter.CreatorId);
+
+                if (config != null)
+                {
+                    config.VacationDay -= letter.DaysOff;
+                    _context.EmployeeConfigs.Update(config);
+                }
+            }
+
             // Cập nhật trạng thái
             letter.StatusId = newStatusId;
 
-            if (newStatusId == 1) // 👉 Nếu cập nhật về Pending
+            if (newStatusId == 1) // Pending
             {
                 letter.ApproverId = 0;
                 letter.ApprovalDate = DateTime.MinValue;
             }
             else
             {
-                letter.ApproverId = employeeId;
+                letter.ApproverId = employeeId; // 👉 ghi nhận đúng người thay đổi quyết định
                 letter.ApprovalDate = DateTime.Now;
             }
 
@@ -300,6 +359,7 @@ namespace SiamInternalApi.Controllers
                 status = newStatusId
             });
         }
+
 
 
 
@@ -360,6 +420,16 @@ namespace SiamInternalApi.Controllers
             if (!canApprove)
                 return Forbid("You are not allowed to approve this letter");
 
+            if (letter.DayOffTypeId == 1 && letter.StatusId == 4) 
+            { 
+                var config = await _context.EmployeeConfigs 
+                    .FirstOrDefaultAsync(ec => ec.EmployeeId == letter.CreatorId); 
+                if (config != null) 
+                { 
+                    config.VacationDay -= letter.DaysOff; 
+                    _context.EmployeeConfigs.Update(config); 
+                } 
+            }
             // Cập nhật trạng thái
             letter.StatusId = 3; // approved
             letter.ApproverId = employeeId;
@@ -429,6 +499,16 @@ namespace SiamInternalApi.Controllers
             letter.StatusId = 4; // rejected
             letter.ApproverId = employeeId;
             letter.ApprovalDate = DateTime.Now;
+            if (letter.DayOffTypeId == 1) 
+            { 
+                var config = await _context.EmployeeConfigs 
+                    .FirstOrDefaultAsync(ec => ec.EmployeeId == letter.CreatorId); 
+                if (config != null) 
+                { 
+                    config.VacationDay += letter.DaysOff; 
+                    _context.EmployeeConfigs.Update(config); 
+                } 
+            }
 
             await _context.SaveChangesAsync();
 
@@ -468,26 +548,6 @@ namespace SiamInternalApi.Controllers
             return File(bytes, "text/csv", $"LeaveReport_{year}_{month}.csv");
         }
 
-        [HttpGet("balance")]
-        [Authorize]
-        public async Task<IActionResult> GetVacationBalance()
-        {
-            var employeeId = int.Parse(User.FindFirst("EmployeeId")!.Value);
-
-            var config = await _context.EmployeeConfigs
-                .FirstOrDefaultAsync(ec => ec.EmployeeId == employeeId);
-
-            if (config == null)
-                return NotFound("Employee config not found");
-
-            return Ok(new
-            {
-                employeeId = employeeId,
-                vacationDay = config.VacationDay
-            });
-        }
-
-
 
         // Helper để map sang DTO hiển thị
         private static LetterViewDto MapToViewDto(Letter l)
@@ -498,6 +558,7 @@ namespace SiamInternalApi.Controllers
                 {
                     Id = l.Id,
                     Code = l.Code,
+                    CreatorId = l.CreatorId,
                     FromDate = l.FromDate,
                     ToDate = l.ToDate,
                     DaysOff = l.DaysOff,
