@@ -51,7 +51,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/create-leave-request',
-        builder: (context, state) => const CreateLeaveRequestScreen(),
+        builder: (context, state) {
+          final args = state.extra as Map<String, dynamic>?;
+          return CreateLeaveRequestScreen(args: args);
+        },
       ),
       GoRoute(
         path: '/profile',

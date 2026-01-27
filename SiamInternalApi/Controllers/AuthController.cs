@@ -5,6 +5,7 @@ using SiamInternalApi.Models;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using System.Security.Cryptography;
 
 namespace SiamInternalApi.Controllers
 {
@@ -29,8 +30,15 @@ namespace SiamInternalApi.Controllers
             if (user == null)
                 return Unauthorized("User not found or inactive");
 
-            if (user.Password != request.Password)
-                return Unauthorized("Invalid password");
+            using (var md5 = MD5.Create()) 
+            {
+                var inputBytes = Encoding.UTF8.GetBytes(request.Password); 
+                var hashBytes = md5.ComputeHash(inputBytes); 
+                var hashedPassword = BitConverter.ToString(hashBytes).Replace("-", "").ToLower(); 
+
+                if (user.Password != hashedPassword) 
+                    return Unauthorized("Invalid password"); 
+            }
 
             var claims = new[]
             {

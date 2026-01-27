@@ -8,5 +8,6 @@ namespace SiamInternalApi.DTO
         public int OffTypeId { get; set; }    
         public string Reason { get; set; } = "";
         public string? ReplacePerson { get; set; }
+        public byte? StatusId { get; set; }
     }
 }

@@ -1,18 +1,23 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:siam_internal_app/presentation/utils/language.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '/presentation/providers/auth_provider.dart';
 
-class CreateLeaveRequestScreen extends StatefulWidget {
-  const CreateLeaveRequestScreen({super.key});
+class CreateLeaveRequestScreen extends ConsumerStatefulWidget {
+  const CreateLeaveRequestScreen({super.key, this.args});
+  final Map<String, dynamic>? args;
 
   @override
-  State<CreateLeaveRequestScreen> createState() =>
+  ConsumerState<CreateLeaveRequestScreen> createState() =>
       _CreateLeaveRequestScreenState();
 }
 
-class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
+class _CreateLeaveRequestScreenState
+    extends ConsumerState<CreateLeaveRequestScreen> {
   final _formKey = GlobalKey<FormState>();
   final _reasonController = TextEditingController();
   final _replaceController = TextEditingController();
@@ -25,9 +30,10 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
   List<Map<String, dynamic>> _dayOffTypes = [];
   bool _loadingBalance = true;
   double? _remainingDays;
+  double? _compensationDays;
   String? _error;
 
-  static const String baseUrl = "http://localhost:5204";
+  final baseUrl = dotenv.env['API_BASE_URL'];
 
   @override
   void initState() {
@@ -36,25 +42,124 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
     _loadVacationBalance();
   }
 
+  int? _editingId;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final args = widget.args;
+    if (args != null) {
+      _editingId = args['id']; // lấy id đơn nháp
+      _reasonController.text = args['reason'] ?? '';
+      _replaceController.text = args['replacePerson'] ?? '';
+      _startDate = DateTime.tryParse(args['fromDate']) ?? DateTime.now();
+      _endDate = DateTime.tryParse(args['toDate']) ?? DateTime.now();
+
+      final dynamicTypeId = args['dayOffTypeId'];
+      _selectedDayOffTypeId = (dynamicTypeId is int)
+          ? dynamicTypeId
+          : int.tryParse(dynamicTypeId?.toString() ?? '');
+
+      _selectedOffType = _mapOffType(args['offTypeId']);
+    }
+  }
+
+  String _mapOffType(dynamic offTypeId) {
+    switch (offTypeId) {
+      case 1:
+        return 'Morning';
+      case 2:
+        return 'Afternoon';
+      case 3:
+        return 'Full Day';
+      default:
+        return 'Full Day';
+    }
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _submitting = true);
+
+    try {
+      final token = ref.read(authProvider).value?.token;
+      if (token == null) return;
+
+      final body = {
+        'fromDate': _startDate.toIso8601String(),
+        'toDate': _endDate.toIso8601String(),
+        'dayOffTypeId': _selectedDayOffTypeId,
+        'offTypeId': _selectedOffType == 'Full Day'
+            ? 3
+            : _selectedOffType == 'Afternoon'
+                ? 2
+                : 1,
+        'reason': _reasonController.text,
+        'replacePerson': _replaceController.text,
+      };
+
+      http.Response res;
+      if (_editingId != null) {
+        // 👉 sửa đơn nháp
+        final uri = Uri.parse('$baseUrl/api/Letters/$_editingId/edit');
+        res = await http.put(uri,
+            headers: {
+              'Authorization': 'Bearer $token',
+              'Content-Type': 'application/json'
+            },
+            body: jsonEncode(body));
+      } else {
+        // 👉 tạo mới đơn nháp
+        final uri = Uri.parse('$baseUrl/api/Letters');
+        res = await http.post(uri,
+            headers: {
+              'Authorization': 'Bearer $token',
+              'Content-Type': 'application/json'
+            },
+            body: jsonEncode({...body, 'statusId': 1}));
+      }
+
+      if (res.statusCode == 200) {
+        _showDialog(
+          lang('notification', 'Thông báo'),
+          _editingId == null
+              ? lang('save_success', 'Đã lưu nháp đơn nghỉ thành công')
+              : lang('update_success', 'Đã cập nhật đơn nháp thành công'),
+          onOk: () {
+            Navigator.pop(context, true);
+          },
+        );
+      } else {
+        _showDialog(
+            lang('notification', 'Thông báo'), 'Lỗi khi lưu nháp: ${res.body}');
+      }
+    } catch (e) {
+      _showDialog(lang('notification', 'Thông báo'), 'Unexpected error: $e');
+    } finally {
+      setState(() => _submitting = false);
+    }
+  }
+
   Future<void> _loadVacationBalance() async {
     setState(() => _loadingBalance = true);
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString("token");
+      final token = ref.read(authProvider).value?.token;
       if (token == null) return;
 
-      final uri = Uri.parse("$baseUrl/api/Letters/balance");
+      final uri = Uri.parse('$baseUrl/api/Letters/balance');
       final res =
-          await http.get(uri, headers: {"Authorization": "Bearer $token"});
+          await http.get(uri, headers: {'Authorization': 'Bearer $token'});
 
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body);
         setState(() {
-          _remainingDays = (data["vacationDay"] as num).toDouble();
+          _remainingDays = (data['vacationDay'] as num).toDouble();
+          _compensationDays = (data['compensationDay'] as num).toDouble();
         });
       } else {
         setState(() {
-          _error = "Failed to load balance: ${res.statusCode}";
+          _error = 'Failed to load balance: ${res.statusCode}';
         });
       }
     } catch (e) {
@@ -66,24 +171,39 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
 
   Future<void> _loadDayOffTypes() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString("token");
+      final token = ref.read(authProvider).value?.token;
       if (token == null) return;
 
-      final uri = Uri.parse("$baseUrl/api/Letters/dayofftypes");
+      final uri = Uri.parse('$baseUrl/api/Letters/dayofftypes');
       final res =
-          await http.get(uri, headers: {"Authorization": "Bearer $token"});
+          await http.get(uri, headers: {'Authorization': 'Bearer $token'});
       if (res.statusCode == 200) {
         final List data = jsonDecode(res.body);
         setState(() {
-          _dayOffTypes = data.cast<Map<String, dynamic>>();
+          _dayOffTypes = data.map((e) {
+            final map = Map<String, dynamic>.from(e);
+            final dynamicId = map['id'];
+            map['id'] = (dynamicId is int)
+                ? dynamicId
+                : int.tryParse(dynamicId.toString());
+            return map;
+          }).toList();
+
           if (_dayOffTypes.isNotEmpty) {
-            _selectedDayOffTypeId = _dayOffTypes.first["id"];
+            if (_selectedDayOffTypeId != null) {
+              // 👉 sửa nháp: kiểm tra id có tồn tại trong danh sách không
+              final exists =
+                  _dayOffTypes.any((t) => t['id'] == _selectedDayOffTypeId);
+              if (!exists) {
+                _selectedDayOffTypeId =
+                    null; // fallback về "Vui lòng chọn loại ngày nghỉ"
+              }
+            }
           }
         });
       }
     } catch (e) {
-      debugPrint("Error loading dayofftypes: $e");
+      debugPrint('Error loading dayofftypes: $e');
     }
   }
 
@@ -135,7 +255,7 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             ),
             icon: const Icon(Icons.check, color: Colors.white),
-            label: const Text("OK",
+            label: const Text('OK',
                 style: TextStyle(
                     color: Colors.white, fontWeight: FontWeight.bold)),
             onPressed: () {
@@ -151,6 +271,15 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
+    if (_selectedDayOffTypeId == null) {
+      _showDialog('Thông báo', 'Vui lòng chọn loại ngày nghỉ');
+      return;
+    }
+    if (_reasonController.text.trim().isEmpty) {
+      _showDialog('Thông báo', 'Vui lòng nhập lý do');
+      return;
+    }
+
     final today = DateTime.now();
     if (_startDate.isBefore(today) || _endDate.isBefore(today)) {
       _showDialog(
@@ -161,16 +290,17 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
     }
 
     if (_startDate != _endDate &&
-        (_selectedOffType == "Morning" || _selectedOffType == "Afternoon")) {
+        (_selectedOffType == 'Morning' || _selectedOffType == 'Afternoon')) {
       _showDialog(
           lang('notification', 'Thông báo'),
           lang('cannot_create_session',
               'Không thể tạo đơn buổi sáng/chiều cho nhiều ngày liên tiếp. Vui lòng chọn Cả ngày'));
       return;
     }
+
     if (_selectedDayOffTypeId == 1 && _remainingDays != null) {
       double totalDays;
-      if (_selectedOffType == "Morning" || _selectedOffType == "Afternoon") {
+      if (_selectedOffType == 'Morning' || _selectedOffType == 'Afternoon') {
         totalDays = 0.5;
       } else {
         totalDays = _endDate.difference(_startDate).inDays + 1;
@@ -181,21 +311,21 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
         return;
       }
     }
+
     setState(() => _submitting = true);
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString("token");
+      final token = ref.read(authProvider).value?.token;
       if (token == null) {
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text("Error"),
-            content: const Text("No token found"),
+            title: const Text('Error'),
+            content: const Text('No token found'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text("OK"),
+                child: const Text('OK'),
               ),
             ],
           ),
@@ -212,19 +342,20 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
       };
 
       final body = {
-        "fromDate": _startDate.toIso8601String(),
-        "toDate": _endDate.toIso8601String(),
-        "dayOffTypeId": _selectedDayOffTypeId,
-        "offTypeId": offTypeId,
-        "reason": _reasonController.text,
-        "replacePerson": _replaceController.text
+        'fromDate': _startDate.toIso8601String(),
+        'toDate': _endDate.toIso8601String(),
+        'dayOffTypeId': _selectedDayOffTypeId,
+        'offTypeId': offTypeId,
+        'reason': _reasonController.text,
+        'replacePerson': _replaceController.text,
+        'statusId': 2
       };
 
-      final uri = Uri.parse("$baseUrl/api/Letters");
+      final uri = Uri.parse('$baseUrl/api/Letters');
       final res = await http.post(uri,
           headers: {
-            "Authorization": "Bearer $token",
-            "Content-Type": "application/json"
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json'
           },
           body: jsonEncode(body));
 
@@ -239,11 +370,11 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
             backgroundColor: Colors.indigo.shade50,
             title: Row(
               children: [
-                Icon(Icons.info, color: Colors.indigo),
-                SizedBox(width: 8),
+                const Icon(Icons.info, color: Colors.indigo),
+                const SizedBox(width: 8),
                 Text(
                   lang('notification', 'Thông báo'),
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                     color: Colors.indigo,
@@ -253,7 +384,7 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
             ),
             content: Text(
               lang('create_success', 'Bạn đã tạo đơn nghỉ thành công'),
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 16,
                 color: Colors.black87,
               ),
@@ -271,7 +402,7 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
                   ),
                   icon: const Icon(Icons.check, color: Colors.white),
                   label: const Text(
-                    "OK",
+                    'OK',
                     style: TextStyle(
                         color: Colors.white, fontWeight: FontWeight.bold),
                   ),
@@ -286,7 +417,7 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
         String message;
         try {
           final data = jsonDecode(res.body);
-          message = data["title"] ?? data["message"] ?? res.body;
+          message = data['title'] ?? data['message'] ?? res.body;
         } catch (_) {
           message = res.body;
         }
@@ -299,7 +430,7 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text("OK"),
+                child: const Text('OK'),
               ),
             ],
           ),
@@ -310,11 +441,11 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
         context: context,
         builder: (context) => AlertDialog(
           title: Text(lang('notification', 'Thông báo')),
-          content: Text("Unexpected error: $e"),
+          content: Text('Unexpected error: $e'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text("OK"),
+              child: const Text('OK'),
             ),
           ],
         ),
@@ -324,7 +455,7 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
     }
   }
 
-  String _formatDate(DateTime d) => "${d.day}/${d.month}/${d.year}";
+  String _formatDate(DateTime d) => '${d.day}/${d.month}/${d.year}';
 
   @override
   Widget build(BuildContext context) {
@@ -332,50 +463,26 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(lang('create_leave_request', 'Tạo đơn nghỉ phép'),
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.5,
-              shadows: [
-                Shadow(
-                  blurRadius: 4.0,
-                  color: Colors.black45,
-                  offset: Offset(2.0, 2.0),
-                ),
-              ],
-            )),
+        title: Text(
+          _editingId == null
+              ? lang('create_leave_request', 'Tạo đơn nghỉ phép')
+              : lang('edit_leave_request', 'Sửa đơn nghỉ phép'),
+          style: const TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.5,
+            shadows: [
+              Shadow(
+                blurRadius: 4.0,
+                color: Colors.black45,
+                offset: Offset(2.0, 2.0),
+              ),
+            ],
+          ),
+        ),
         backgroundColor: Colors.indigo,
         elevation: 3,
         foregroundColor: Colors.white,
-        actions: [
-          if (_loadingBalance)
-            const Padding(
-              padding: EdgeInsets.only(right: 16),
-              child: SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
-              ),
-            )
-          else if (_remainingDays != null)
-            Padding(
-              padding: const EdgeInsets.only(right: 16),
-              child: Center(
-                child: Text(
-                  '${lang('remaining_days', 'Ngày phép còn lại')}: $_remainingDays ',
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ),
-        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -405,20 +512,20 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
 
                   //OffType drop
                   DropdownButtonFormField<String>(
-                    value: _selectedOffType,
+                    initialValue: _selectedOffType,
                     items: [
                       DropdownMenuItem(
                           value: null,
                           child: Text(lang(
                               'select_session', 'Vui lòng chọn buổi nghỉ'))),
                       DropdownMenuItem(
-                          value: "Full Day",
+                          value: 'Full Day',
                           child: Text(lang('full_day', 'Cả ngày'))),
                       DropdownMenuItem(
-                          value: "Morning",
+                          value: 'Morning',
                           child: Text(lang('morning', 'Buổi sáng'))),
                       DropdownMenuItem(
-                          value: "Afternoon",
+                          value: 'Afternoon',
                           child: Text(lang('afternoon', 'Buổi chiều'))),
                     ],
                     onChanged: (val) => setState(() => _selectedOffType = val),
@@ -427,7 +534,7 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
                         : null,
                     decoration: InputDecoration(
                       labelText: lang('session', 'Buổi nghỉ'),
-                      border: OutlineInputBorder(),
+                      border: const OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -436,6 +543,8 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
                   _dayOffTypes.isEmpty
                       ? const LinearProgressIndicator(minHeight: 4)
                       : DropdownButtonFormField<int>(
+                          isExpanded: true,
+                          initialValue: _selectedDayOffTypeId,
                           items: [
                             DropdownMenuItem(
                                 value: null,
@@ -443,10 +552,10 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
                                     'Vui lòng chọn loại ngày nghỉ'))),
                             ..._dayOffTypes.map((type) {
                               return DropdownMenuItem<int>(
-                                value: type["id"],
-                                child: Text(type["name"]),
+                                value: type['id'],
+                                child: Text(type['name']),
                               );
-                            }).toList(),
+                            }),
                           ],
                           onChanged: (val) =>
                               setState(() => _selectedDayOffTypeId = val),
@@ -456,7 +565,7 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
                               : null,
                           decoration: InputDecoration(
                             labelText: lang('leave_type', 'Loại ngày nghỉ'),
-                            border: OutlineInputBorder(),
+                            border: const OutlineInputBorder(),
                           ),
                         ),
                   const SizedBox(height: 20),
@@ -532,36 +641,119 @@ class _CreateLeaveRequestScreenState extends State<CreateLeaveRequestScreen> {
                   const SizedBox(height: 24),
 
                   // Submit button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: _submitting ? null : _submit,
-                      icon: _submitting
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.white),
-                            )
-                          : const Icon(Icons.send),
-                      label: Text(
-                        _submitting
-                            ? lang('submitting', 'Đang gửi...')
-                            : lang('submit_leave', 'Gửi đơn nghỉ'),
-                        style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: _submitting ? null : _save,
+                          icon: const Icon(Icons.save),
+                          label: Text(
+                            lang('save_leave', 'Lưu nháp'),
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.black,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.grey,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 5,
+                          ),
+                        ),
                       ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.indigo,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                        elevation: 5,
+                      if (widget.args == null) ...[
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: _submitting ? null : _submit,
+                            icon: const Icon(Icons.send),
+                            label: Text(
+                              lang('submit_leave', 'Gửi đơn nghỉ'),
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.indigo,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 5,
+                            ),
+                          ),
+                        ),
+                      ]
+                    ],
+                  ),
+
+                  const SizedBox(height: 20),
+                  if (_remainingDays != null || _compensationDays != null)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Column(
+                        children: [
+                          if (_remainingDays != null)
+                            Card(
+                              color: Colors.green.shade50,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: ListTile(
+                                leading: const Icon(Icons.calendar_today,
+                                    color: Colors.green),
+                                title: Text(
+                                  lang('remaining_days', 'Ngày phép còn lại'),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.green,
+                                  ),
+                                ),
+                                trailing: Text(
+                                  '$_remainingDays',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.green,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          if (_compensationDays != null)
+                            Card(
+                              color: Colors.orange.shade50,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: ListTile(
+                                leading: const Icon(Icons.access_time,
+                                    color: Colors.orange),
+                                title: Text(
+                                  lang('compensation_days', 'Ngày bù còn lại'),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.orange,
+                                  ),
+                                ),
+                                trailing: Text(
+                                  '$_compensationDays',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.orange,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
-                  ),
                 ],
               ),
             ),

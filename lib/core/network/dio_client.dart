@@ -2,18 +2,18 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../constants/api_constants.dart';
 import '../../presentation/providers/auth_provider.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 final dioProvider = Provider<Dio>((ref) {
   final dio = Dio(
     BaseOptions(
-      baseUrl: ApiConstants.baseUrl,
+      baseUrl: dotenv.env['API_BASE_URL'] ?? '',
       connectTimeout: ApiConstants.connectTimeout,
       receiveTimeout: ApiConstants.receiveTimeout,
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       },
-      // Cho phép nhận cả 401 để tự xử lý
       validateStatus: (status) {
         return status != null && status < 500;
       },
@@ -43,7 +43,6 @@ final dioProvider = Provider<Dio>((ref) {
       handler.next(response);
     },
     onError: (error, handler) {
-      // Nếu là 401 thì resolve response, KHÔNG throw
       if (error.response?.statusCode == 401) {
         return handler.resolve(error.response!);
       }

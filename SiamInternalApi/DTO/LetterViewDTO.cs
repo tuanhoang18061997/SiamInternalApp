@@ -14,7 +14,7 @@ namespace SiamInternalApi.DTO
         public byte StatusId { get; set; }
         public byte OffTypeId { get; set; }
         public string ReplacePerson { get; set; } = "";
-
+        public int DayOffTypeId { get; set; }
         // Thông tin hiển thị thêm
         public string CreatorName { get; set; } = "";
         public string ApproverName { get; set; } = "";

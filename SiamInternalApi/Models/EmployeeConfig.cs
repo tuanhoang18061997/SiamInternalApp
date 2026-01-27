@@ -50,6 +50,9 @@ namespace SiamInternalApi.Models
 
         [Column("work_hours")]
         public decimal WorkHour  { get; set; }
+
+        [Column("compensation_day")]
+        public decimal CompensationDay {get; set;}
         
         [Column("vacation_day")]
         public decimal VacationDay { get; set; }
