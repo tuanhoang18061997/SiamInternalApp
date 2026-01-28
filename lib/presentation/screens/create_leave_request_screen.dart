@@ -80,6 +80,30 @@ class _CreateLeaveRequestScreenState
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
 
+    final today = DateTime.now();
+    if (_startDate.isBefore(today) || _endDate.isBefore(today)) {
+      _showDialog(
+        'Thông báo',
+        'Ngày đã qua không thể lưu nháp đơn nghỉ',
+      );
+      return;
+    }
+    if (_endDate.isBefore(_startDate)) {
+      _showDialog(
+        'Thông báo',
+        'Ngày kết thúc không thể trước ngày bắt đầu',
+      );
+      return;
+    }
+    if (_startDate.weekday == DateTime.sunday ||
+        _endDate.weekday == DateTime.sunday) {
+      _showDialog(
+        'Thông báo',
+        'Không thể lưu nháp đơn nghỉ vào Chủ Nhật',
+      );
+      return;
+    }
+
     setState(() => _submitting = true);
 
     try {
@@ -122,20 +146,19 @@ class _CreateLeaveRequestScreenState
 
       if (res.statusCode == 200) {
         _showDialog(
-          lang('notification', 'Thông báo'),
+          'Thông báo',
           _editingId == null
-              ? lang('save_success', 'Đã lưu nháp đơn nghỉ thành công')
-              : lang('update_success', 'Đã cập nhật đơn nháp thành công'),
+              ? 'Đã lưu nháp đơn nghỉ thành công'
+              : 'Đã cập nhật đơn nháp thành công',
           onOk: () {
             Navigator.pop(context, true);
           },
         );
       } else {
-        _showDialog(
-            lang('notification', 'Thông báo'), 'Lỗi khi lưu nháp: ${res.body}');
+        _showDialog('Thông báo', '${res.body}');
       }
     } catch (e) {
-      _showDialog(lang('notification', 'Thông báo'), 'Unexpected error: $e');
+      _showDialog('Thông báo', 'Unexpected error: $e');
     } finally {
       setState(() => _submitting = false);
     }
@@ -282,19 +305,31 @@ class _CreateLeaveRequestScreenState
 
     final today = DateTime.now();
     if (_startDate.isBefore(today) || _endDate.isBefore(today)) {
+      _showDialog('Thông báo', 'Ngày đã qua không thể chọn để tạo đơn nghỉ');
+      return;
+    }
+
+    if (_endDate.isBefore(_startDate)) {
       _showDialog(
-          lang('notification', 'Thông báo'),
-          lang(
-              'past_date_error', 'Ngày đã qua không thể chọn để tạo đơn nghỉ'));
+        'Thông báo',
+        'Ngày kết thúc không thể trước ngày bắt đầu',
+      );
+      return;
+    }
+
+    if (_startDate.weekday == DateTime.sunday ||
+        _endDate.weekday == DateTime.sunday) {
+      _showDialog(
+        'Thông báo',
+        'Không thể tạo đơn nghỉ vào Chủ Nhật',
+      );
       return;
     }
 
     if (_startDate != _endDate &&
         (_selectedOffType == 'Morning' || _selectedOffType == 'Afternoon')) {
-      _showDialog(
-          lang('notification', 'Thông báo'),
-          lang('cannot_create_session',
-              'Không thể tạo đơn buổi sáng/chiều cho nhiều ngày liên tiếp. Vui lòng chọn Cả ngày'));
+      _showDialog('Thông báo',
+          'Không thể tạo đơn buổi sáng/chiều cho nhiều ngày liên tiếp. Vui lòng chọn Cả ngày');
       return;
     }
 
@@ -306,8 +341,8 @@ class _CreateLeaveRequestScreenState
         totalDays = _endDate.difference(_startDate).inDays + 1;
       }
       if (_remainingDays! < totalDays) {
-        _showDialog(lang('notification', 'Thông báo'),
-            '${lang('not_enough_days', 'Bạn không đủ ngày phép để tạo đơn này. Ngày phép còn lại')}: $_remainingDays');
+        _showDialog('Thông báo',
+            '${'Bạn không đủ ngày phép để tạo đơn này. Ngày phép còn lại'}: $_remainingDays');
         return;
       }
     }
@@ -373,7 +408,7 @@ class _CreateLeaveRequestScreenState
                 const Icon(Icons.info, color: Colors.indigo),
                 const SizedBox(width: 8),
                 Text(
-                  lang('notification', 'Thông báo'),
+                  'Thông báo',
                   style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -383,7 +418,7 @@ class _CreateLeaveRequestScreenState
               ],
             ),
             content: Text(
-              lang('create_success', 'Bạn đã tạo đơn nghỉ thành công'),
+              'Bạn đã tạo đơn nghỉ thành công',
               style: const TextStyle(
                 fontSize: 16,
                 color: Colors.black87,
@@ -425,7 +460,7 @@ class _CreateLeaveRequestScreenState
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
-            title: Text(lang('notification', 'Thông báo')),
+            title: Text('Thông báo'),
             content: Text(message),
             actions: [
               TextButton(
@@ -440,7 +475,7 @@ class _CreateLeaveRequestScreenState
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          title: Text(lang('notification', 'Thông báo')),
+          title: Text('Thông báo'),
           content: Text('Unexpected error: $e'),
           actions: [
             TextButton(
@@ -464,9 +499,7 @@ class _CreateLeaveRequestScreenState
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          _editingId == null
-              ? lang('create_leave_request', 'Tạo đơn nghỉ phép')
-              : lang('edit_leave_request', 'Sửa đơn nghỉ phép'),
+          _editingId == null ? 'Tạo đơn nghỉ phép' : 'Sửa đơn nghỉ phép',
           style: const TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.bold,
@@ -501,7 +534,7 @@ class _CreateLeaveRequestScreenState
                       const Icon(Icons.event_note, color: Colors.indigo),
                       const SizedBox(width: 8),
                       Text(
-                        lang('leave_request_detail', 'Thông tin đơn nghỉ'),
+                        'Thông tin đơn nghỉ',
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w700,
                         ),
@@ -515,25 +548,19 @@ class _CreateLeaveRequestScreenState
                     initialValue: _selectedOffType,
                     items: [
                       DropdownMenuItem(
-                          value: null,
-                          child: Text(lang(
-                              'select_session', 'Vui lòng chọn buổi nghỉ'))),
+                          value: null, child: Text('Vui lòng chọn buổi nghỉ')),
                       DropdownMenuItem(
-                          value: 'Full Day',
-                          child: Text(lang('full_day', 'Cả ngày'))),
+                          value: 'Full Day', child: Text('Cả ngày')),
                       DropdownMenuItem(
-                          value: 'Morning',
-                          child: Text(lang('morning', 'Buổi sáng'))),
+                          value: 'Morning', child: Text('Buổi sáng')),
                       DropdownMenuItem(
-                          value: 'Afternoon',
-                          child: Text(lang('afternoon', 'Buổi chiều'))),
+                          value: 'Afternoon', child: Text('Buổi chiều')),
                     ],
                     onChanged: (val) => setState(() => _selectedOffType = val),
-                    validator: (v) => v == null
-                        ? lang('select_session', 'Vui lòng chọn buổi nghỉ')
-                        : null,
+                    validator: (v) =>
+                        v == null ? 'Vui lòng chọn buổi nghỉ' : null,
                     decoration: InputDecoration(
-                      labelText: lang('session', 'Buổi nghỉ'),
+                      labelText: 'Buổi nghỉ',
                       border: const OutlineInputBorder(),
                     ),
                   ),
@@ -548,8 +575,7 @@ class _CreateLeaveRequestScreenState
                           items: [
                             DropdownMenuItem(
                                 value: null,
-                                child: Text(lang('select_leave_type',
-                                    'Vui lòng chọn loại ngày nghỉ'))),
+                                child: Text('Vui lòng chọn loại ngày nghỉ')),
                             ..._dayOffTypes.map((type) {
                               return DropdownMenuItem<int>(
                                 value: type['id'],
@@ -559,12 +585,10 @@ class _CreateLeaveRequestScreenState
                           ],
                           onChanged: (val) =>
                               setState(() => _selectedDayOffTypeId = val),
-                          validator: (v) => v == null
-                              ? lang('select_leave_type',
-                                  'Vui lòng chọn loại ngày nghỉ')
-                              : null,
+                          validator: (v) =>
+                              v == null ? 'Vui lòng chọn loại ngày nghỉ' : null,
                           decoration: InputDecoration(
-                            labelText: lang('leave_type', 'Loại ngày nghỉ'),
+                            labelText: 'Loại ngày nghỉ',
                             border: const OutlineInputBorder(),
                           ),
                         ),
@@ -578,7 +602,7 @@ class _CreateLeaveRequestScreenState
                           onTap: () => _pickDate(isStart: true),
                           child: InputDecorator(
                             decoration: InputDecoration(
-                              labelText: lang('start_date', 'Ngày bắt đầu'),
+                              labelText: 'Ngày bắt đầu',
                               prefixIcon: const Icon(Icons.calendar_today,
                                   color: Colors.indigo),
                               border: OutlineInputBorder(
@@ -595,7 +619,7 @@ class _CreateLeaveRequestScreenState
                           onTap: () => _pickDate(isStart: false),
                           child: InputDecorator(
                             decoration: InputDecoration(
-                              labelText: lang('end_date', 'Ngày kết thúc'),
+                              labelText: 'Ngày kết thúc',
                               prefixIcon: const Icon(Icons.calendar_today,
                                   color: Colors.indigo),
                               border: OutlineInputBorder(
@@ -613,15 +637,15 @@ class _CreateLeaveRequestScreenState
                   TextFormField(
                     controller: _reasonController,
                     decoration: InputDecoration(
-                      labelText: lang('reason', 'Lý do'),
-                      hintText: lang('reason_hint', 'Ví dụ: Khám bệnh'),
+                      labelText: 'Lý do',
+                      hintText: 'Ví dụ: Khám bệnh',
                       prefixIcon: const Icon(Icons.notes, color: Colors.indigo),
                       border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12)),
                     ),
                     maxLines: 3,
                     validator: (v) => v == null || v.trim().isEmpty
-                        ? lang('enter_reason', 'Vui lòng nhập lý do xin nghỉ')
+                        ? 'Vui lòng nhập lý do xin nghỉ'
                         : null,
                   ),
                   const SizedBox(height: 16),
@@ -630,8 +654,8 @@ class _CreateLeaveRequestScreenState
                   TextFormField(
                     controller: _replaceController,
                     decoration: InputDecoration(
-                      labelText: lang('replace', 'Người bàn giao'),
-                      hintText: lang('replace_hint', 'Tên người bàn giao'),
+                      labelText: 'Người bàn giao',
+                      hintText: 'Tên người bàn giao',
                       prefixIcon: const Icon(Icons.person_outline,
                           color: Colors.indigo),
                       border: OutlineInputBorder(
@@ -648,7 +672,7 @@ class _CreateLeaveRequestScreenState
                           onPressed: _submitting ? null : _save,
                           icon: const Icon(Icons.save),
                           label: Text(
-                            lang('save_leave', 'Lưu nháp'),
+                            'Lưu nháp',
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w700,
@@ -672,7 +696,7 @@ class _CreateLeaveRequestScreenState
                             onPressed: _submitting ? null : _submit,
                             icon: const Icon(Icons.send),
                             label: Text(
-                              lang('submit_leave', 'Gửi đơn nghỉ'),
+                              'Gửi đơn nghỉ',
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w700,
@@ -709,7 +733,7 @@ class _CreateLeaveRequestScreenState
                                 leading: const Icon(Icons.calendar_today,
                                     color: Colors.green),
                                 title: Text(
-                                  lang('remaining_days', 'Ngày phép còn lại'),
+                                  'Ngày phép còn lại',
                                   style: const TextStyle(
                                     fontWeight: FontWeight.bold,
                                     color: Colors.green,
@@ -735,7 +759,7 @@ class _CreateLeaveRequestScreenState
                                 leading: const Icon(Icons.access_time,
                                     color: Colors.orange),
                                 title: Text(
-                                  lang('compensation_days', 'Ngày bù còn lại'),
+                                  'Ngày bù còn lại',
                                   style: const TextStyle(
                                     fontWeight: FontWeight.bold,
                                     color: Colors.orange,

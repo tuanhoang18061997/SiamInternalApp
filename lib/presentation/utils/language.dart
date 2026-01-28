@@ -101,9 +101,9 @@ Map<String, String> _en = {
   'managed_letters': 'Managed Letters',
 };
 
-String currentLanguage = "vi";
+String currentLanguage = 'vi';
 
 String lang(String key, String defaultString) {
-  if (currentLanguage == "en") return _en[key] ?? defaultString;
+  if (currentLanguage == 'en') return _en[key] ?? defaultString;
   return _vi[key] ?? defaultString;
 }

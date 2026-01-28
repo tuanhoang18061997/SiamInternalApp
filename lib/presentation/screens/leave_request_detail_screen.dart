@@ -48,7 +48,7 @@ class _LeaveRequestDetailScreenState
             content: Text('Đã xóa đơn nháp thành công'),
             backgroundColor: Colors.green),
       );
-      Navigator.pop(context, true); // 👉 quay về Home và reload
+      Navigator.pop(context, true);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -72,7 +72,7 @@ class _LeaveRequestDetailScreenState
           ElevatedButton(
             child: const Text('Đồng ý'),
             onPressed: () async {
-              Navigator.pop(context); // đóng dialog
+              Navigator.pop(context);
               await _deleteDraft(letterId);
             },
           ),
@@ -90,33 +90,26 @@ class _LeaveRequestDetailScreenState
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
-              title: Text(lang('update_status', 'Cập nhật trạng thái đơn')),
+              title: Text('Cập nhật trạng thái đơn'),
               content: DropdownButtonFormField<int>(
                 initialValue: selectedStatus,
                 items: [
-                  DropdownMenuItem(
-                      value: 2,
-                      child: Text(lang('status_pending', 'Đang chờ duyệt'))),
-                  DropdownMenuItem(
-                      value: 3,
-                      child: Text(lang('status_approved', 'Đã duyệt'))),
-                  DropdownMenuItem(
-                      value: 4,
-                      child: Text(lang('status_rejected', 'Không duyệt'))),
+                  DropdownMenuItem(value: 2, child: Text('Đang chờ duyệt')),
+                  DropdownMenuItem(value: 3, child: Text('Đã duyệt')),
+                  DropdownMenuItem(value: 4, child: Text('Không duyệt')),
                 ],
                 onChanged: (val) {
                   if (val != null) setState(() => selectedStatus = val);
                 },
-                decoration:
-                    InputDecoration(labelText: lang('status', 'Trạng thái')),
+                decoration: InputDecoration(labelText: 'Trạng thái'),
               ),
               actions: [
                 TextButton(
-                  child: Text(lang('cancel', 'Hủy')),
+                  child: Text('Hủy'),
                   onPressed: () => Navigator.pop(context),
                 ),
                 ElevatedButton(
-                  child: Text(lang('update', 'Cập nhật')),
+                  child: Text('Cập nhật'),
                   onPressed: () async {
                     Navigator.pop(context);
                     await _updateStatus(letterId, selectedStatus);
@@ -131,6 +124,62 @@ class _LeaveRequestDetailScreenState
   }
 
   Future<void> _submitDraft(int letterId) async {
+    final fromDate = DateTime.tryParse(request?['fromDate'] ?? '');
+    final toDate = DateTime.tryParse(request?['toDate'] ?? '');
+    final today = DateTime.now();
+
+    if ((fromDate != null && fromDate.weekday == DateTime.sunday) ||
+        (toDate != null && toDate.weekday == DateTime.sunday)) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Thông báo'),
+          content: const Text('Không thể gửi hoặc lưu đơn nghỉ vào Chủ Nhật'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    if (fromDate != null && fromDate.isBefore(today) ||
+        toDate != null && toDate.isBefore(today)) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Thông báo'),
+          content: const Text('Ngày đã qua không thể gửi đơn nghỉ'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+    if (fromDate != null && toDate != null && toDate.isBefore(fromDate)) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Thông báo'),
+          content: const Text('Ngày kết thúc không thể trước ngày bắt đầu'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     final token = ref.read(authProvider).value?.token;
     if (token == null) return;
 
@@ -144,13 +193,13 @@ class _LeaveRequestDetailScreenState
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          title: Text(lang('notification', 'Thông báo')),
-          content: Text(lang('create_success', 'Đã gửi đơn nghỉ thành công')),
+          title: Text('Thông báo'),
+          content: Text('Đã gửi đơn nghỉ thành công'),
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.pop(context); // đóng dialog
-                Navigator.pop(context, true); // quay về Home và reload
+                Navigator.pop(context);
+                Navigator.pop(context, true);
               },
               child: const Text('OK'),
             ),
@@ -169,7 +218,7 @@ class _LeaveRequestDetailScreenState
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          title: Text(lang('notification', 'Thông báo')),
+          title: Text('Thông báo'),
           content: Text(message),
           actions: [
             TextButton(
@@ -199,11 +248,11 @@ class _LeaveRequestDetailScreenState
     if (res.statusCode == 200) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(lang('update_success', 'Cập nhật thành công')),
+          content: Text('Cập nhật thành công'),
           backgroundColor: Colors.green,
         ),
       );
-      Navigator.pop(context, true); // báo cho Home reload
+      Navigator.pop(context, true);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -215,6 +264,39 @@ class _LeaveRequestDetailScreenState
   }
 
   Future<void> _callAction(String action) async {
+    final currentStatus = request?['statusId'];
+    if (action == 'approve' && currentStatus == 3) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Thông báo'),
+          content: const Text('Đơn này đã ở trạng thái Đã duyệt'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+    if (action == 'reject' && currentStatus == 4) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Thông báo'),
+          content: const Text('Đơn này đã ở trạng thái Không duyệt'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
     try {
       final token = ref.read(authProvider).value?.token;
       if (token == null) {
@@ -313,7 +395,7 @@ class _LeaveRequestDetailScreenState
           },
         ),
         title: Text(
-          lang('leave_request_detail', 'Thông tin đơn xin nghỉ'),
+          'Thông tin đơn xin nghỉ',
           style: const TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.bold,
@@ -335,7 +417,7 @@ class _LeaveRequestDetailScreenState
           : error != null
               ? Center(child: Text('Lỗi: $error'))
               : request == null
-                  ? Center(child: Text(lang('no_data', 'Không có dữ liệu')))
+                  ? Center(child: Text('Không có dữ liệu'))
                   : SingleChildScrollView(
                       padding: const EdgeInsets.all(16),
                       child: Column(
@@ -351,40 +433,28 @@ class _LeaveRequestDetailScreenState
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  _buildRow(Icons.confirmation_number,
-                                      lang('code', 'Mã đơn'), request!['code']),
-                                  _buildRow(
-                                      Icons.person,
-                                      lang('employee_name', 'Tên nhân viên'),
+                                  _buildRow(Icons.confirmation_number, 'Mã đơn',
+                                      request!['code']),
+                                  _buildRow(Icons.person, 'Tên nhân viên',
                                       request!['creatorName']),
-                                  _buildRow(
-                                      Icons.work,
-                                      lang('leave_type', 'Loại nghỉ'),
+                                  _buildRow(Icons.work, 'Loại nghỉ',
                                       request!['dayOffTypeName']),
-                                  _buildRow(
-                                      Icons.access_time,
-                                      lang('session', 'Buổi nghỉ'),
+                                  _buildRow(Icons.access_time, 'Buổi nghỉ',
                                       _mapOffType(request!['offTypeId'])),
                                   _buildRow(
                                       Icons.calendar_today,
-                                      lang('start_date', 'Ngày bắt đầu'),
+                                      'Ngày bắt đầu',
                                       _formatDate(request!['fromDate'])),
                                   _buildRow(
                                       Icons.calendar_today,
-                                      lang('end_date', 'Ngày kết thúc'),
+                                      'Ngày kết thúc',
                                       _formatDate(request!['toDate'])),
-                                  _buildRow(
-                                      Icons.calendar_view_day,
-                                      lang('dayoff', 'Số ngày nghỉ'),
-                                      request!['daysOff']),
-                                  _buildRow(
-                                      Icons.people,
-                                      lang('replace', 'Người thay thế'),
+                                  _buildRow(Icons.calendar_view_day,
+                                      'Số ngày nghỉ', request!['daysOff']),
+                                  _buildRow(Icons.people, 'Người thay thế',
                                       request!['replacePerson']),
                                   _buildRow(
-                                      Icons.notes,
-                                      lang('reason', 'Lý do'),
-                                      request!['reason']),
+                                      Icons.notes, 'Lý do', request!['reason']),
                                   const SizedBox(height: 12),
                                   Row(
                                     mainAxisAlignment:
@@ -422,8 +492,7 @@ class _LeaveRequestDetailScreenState
                                         IconButton(
                                           icon: const Icon(Icons.edit,
                                               color: Colors.blueGrey),
-                                          tooltip: lang('update_status',
-                                              'Cập nhật trạng thái'),
+                                          tooltip: 'Cập nhật trạng thái',
                                           onPressed: () {
                                             _showUpdateDialog(request!['id'],
                                                 request!['statusId']);
@@ -453,7 +522,7 @@ class _LeaveRequestDetailScreenState
                                     icon: const Icon(Icons.send,
                                         color: Colors.white),
                                     label: Text(
-                                      lang('submit_leave', 'Gửi đơn nghỉ'),
+                                      'Gửi đơn nghỉ',
                                       style: const TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.bold,
@@ -480,7 +549,7 @@ class _LeaveRequestDetailScreenState
                                     icon: const Icon(Icons.edit,
                                         color: Colors.white),
                                     label: Text(
-                                      lang('edit_draft', 'Sửa thông tin'),
+                                      'Sửa thông tin',
                                       style: const TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.bold,
@@ -527,7 +596,7 @@ class _LeaveRequestDetailScreenState
                                             color: Colors.white),
                                         const SizedBox(width: 8),
                                         Text(
-                                          lang('approve_request', 'Duyệt đơn'),
+                                          'Duyệt đơn',
                                           style: const TextStyle(
                                             color: Colors.white,
                                             fontSize: 16,
@@ -561,8 +630,7 @@ class _LeaveRequestDetailScreenState
                                             color: Colors.white),
                                         const SizedBox(width: 8),
                                         Text(
-                                          lang('reject_request',
-                                              'Không duyệt đơn'),
+                                          'Không duyệt đơn',
                                           style: const TextStyle(
                                             color: Colors.white,
                                             fontSize: 16,
@@ -605,7 +673,7 @@ class _LeaveRequestDetailScreenState
                                             color: Colors.white),
                                         const SizedBox(width: 8),
                                         Text(
-                                          lang('change_to_approved', 'DUYỆT'),
+                                          'DUYỆT',
                                           style: const TextStyle(
                                             color: Colors.white,
                                             fontSize: 14,
@@ -639,8 +707,7 @@ class _LeaveRequestDetailScreenState
                                             color: Colors.white),
                                         const SizedBox(width: 8),
                                         Text(
-                                          lang('change_to_rejected',
-                                              'KHÔNG DUYỆT'),
+                                          'KHÔNG DUYỆT',
                                           style: const TextStyle(
                                             color: Colors.white,
                                             fontSize: 14,
@@ -681,13 +748,13 @@ class _LeaveRequestDetailScreenState
   String _mapStatus(dynamic statusId) {
     switch (statusId) {
       case 1:
-        return lang('status_draft', 'Đơn nháp');
+        return 'Đơn nháp';
       case 2:
-        return lang('status_pending', 'Đang chờ duyệt');
+        return 'Đang chờ duyệt';
       case 3:
-        return lang('status_approved', 'Đã duyệt');
+        return 'Đã duyệt';
       case 4:
-        return lang('status_rejected', 'Không duyệt');
+        return 'Không duyệt';
       default:
         return 'unknown';
     }

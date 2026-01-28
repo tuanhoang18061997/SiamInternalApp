@@ -293,8 +293,6 @@ namespace SiamInternalApi.Controllers
 
             if (config == null) return NotFound("Employee config not found");
 
-            if (dto.FromDate.DayOfWeek == DayOfWeek.Sunday || dto.ToDate.DayOfWeek == DayOfWeek.Sunday) 
-                return BadRequest("Không thể tạo đơn nghỉ vào Chủ Nhật.");
             //  Kiểm tra trùng ngày
             var hasOverlap = await _context.Letters.AnyAsync(l =>
                 l.CreatorId == employeeId &&

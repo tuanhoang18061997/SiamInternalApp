@@ -22,7 +22,7 @@ Future<void> main() async {
   }
   await dotenv.load(fileName: envFile);
 
-  print("👉 Loaded env file: $envFile");
+  print('👉 Loaded env file: $envFile');
   print("👉 API_BASE_URL: ${dotenv.env['API_BASE_URL']}");
 
   runApp(

@@ -64,7 +64,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              '${lang('login_success', 'Đăng nhập thành công')} :  ${next.value!.displayName}',
+              '${'Đăng nhập thành công'} :  ${next.value!.displayName}',
             ),
             backgroundColor: Colors.green,
           ),
@@ -77,7 +77,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          lang('login_account', 'Đăng nhập tài khoản'),
+          'Đăng nhập tài khoản',
           style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.bold,
@@ -162,14 +162,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   TextFormField(
                     controller: _usernameController,
                     decoration: InputDecoration(
-                      labelText: lang('username', 'Tên tài khoản'),
+                      labelText: 'Tên tài khoản',
                       prefixIcon: Icon(Icons.person),
                       border: OutlineInputBorder(),
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return lang(
-                            'enter_username', 'Vui lòng điền tên tài khoản');
+                        return 'Vui lòng điền tên tài khoản';
                       }
                       return null;
                     },
@@ -178,14 +177,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   TextFormField(
                     controller: _passwordController,
                     decoration: InputDecoration(
-                      labelText: lang('password', 'Mật khẩu'),
+                      labelText: 'Mật khẩu',
                       prefixIcon: Icon(Icons.lock),
                       border: OutlineInputBorder(),
                     ),
                     obscureText: true,
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return lang('enter_password', 'Vui lòng điền mật khẩu');
+                        return 'Vui lòng điền mật khẩu';
                       }
                       return null;
                     },
@@ -202,7 +201,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             width: 20,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : Text(lang('login', 'Đăng nhập')),
+                        : Text('Đăng nhập'),
                   ),
                 ],
               ),

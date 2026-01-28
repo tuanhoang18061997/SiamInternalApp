@@ -122,8 +122,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
 
   String _genderText(dynamic gender) {
     if (gender == null) return '';
-    if (gender.toString() == '1') return lang('male', 'Nam');
-    if (gender.toString() == '2') return lang('female', 'Nữ');
+    if (gender.toString() == '1') return 'Nam';
+    if (gender.toString() == '2') return 'Nữ';
     return '';
   }
 
@@ -228,13 +228,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                 tabs: [
                   Tab(
                       icon: const Icon(Icons.assignment),
-                      text: lang('resume', 'Sơ yếu lý lịch')),
-                  Tab(
-                      icon: const Icon(Icons.person),
-                      text: lang('profile', 'Hồ sơ')),
-                  Tab(
-                      icon: const Icon(Icons.settings),
-                      text: lang('config', 'Cấu hình')),
+                      text: 'Sơ yếu lý lịch'),
+                  Tab(icon: const Icon(Icons.person), text: 'Hồ sơ'),
+                  Tab(icon: const Icon(Icons.settings), text: 'Cấu hình'),
                 ],
               ),
             ),
@@ -251,7 +247,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     );
   }
 
-  /// Tab 1: Sơ yếu lý lịch (Profile hiện tại)
+  /// Tab 1: Sơ yếu lý lịch
   Widget _logoutButton() {
     return SizedBox(
       width: double.infinity,
@@ -296,7 +292,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
           children: [
             Text('Lỗi: $error'),
             const SizedBox(height: 20),
-            _logoutButton(), // 👉 luôn hiển thị logout
+            _logoutButton(),
           ],
         ),
       );
@@ -307,15 +303,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            Text(lang('no_data', 'Không có dữ liệu')),
+            Text('Không có dữ liệu'),
             const SizedBox(height: 20),
-            _logoutButton(), // 👉 luôn hiển thị logout
+            _logoutButton(),
           ],
         ),
       );
     }
 
-    // Nếu có dữ liệu thì render như cũ + nút logout
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -358,55 +353,40 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
             ),
           ),
           const SizedBox(height: 16),
-          _buildSection(lang('personal_info', 'Thông tin cá nhân'), [
-            _buildInfoRow(Icons.badge, lang('attendance_code', 'Mã chấm công'),
+          _buildSection('Thông tin cá nhân', [
+            _buildInfoRow(Icons.badge, 'Mã chấm công',
                 resume!['attendanceCode']?.toString()),
-            _buildInfoRow(Icons.transgender, lang('gender', 'Giới tính'),
-                _genderText(resume!['gender'])),
-            _buildInfoRow(Icons.cake, lang('birthday', 'Ngày sinh'),
-                _formatDate(resume!['dateOfBirth'])),
             _buildInfoRow(
-                Icons.people,
-                lang('marital_status', 'Tình trạng hôn nhân'),
+                Icons.transgender, 'Giới tính', _genderText(resume!['gender'])),
+            _buildInfoRow(
+                Icons.cake, 'Ngày sinh', _formatDate(resume!['dateOfBirth'])),
+            _buildInfoRow(Icons.people, 'Tình trạng hôn nhân',
                 _maritalStatusText(resume!['maritalStatus']?.toString())),
-            _buildInfoRow(Icons.flag, lang('ethnic', 'Dân tộc'),
-                resume!['ethnic']?.toString()),
-            _buildInfoRow(Icons.church, lang('religion', 'Tôn giáo'),
-                resume!['religon']?.toString()),
+            _buildInfoRow(Icons.flag, 'Dân tộc', resume!['ethnic']?.toString()),
             _buildInfoRow(
-                Icons.location_city,
-                lang('place_of_birth', 'Nơi sinh'),
+                Icons.church, 'Tôn giáo', resume!['religon']?.toString()),
+            _buildInfoRow(Icons.location_city, 'Nơi sinh',
                 resume!['placeOfBirth']?.toString()),
-            _buildInfoRow(Icons.public, lang('country', 'Quốc gia'),
-                resume!['country']?.toString()),
+            _buildInfoRow(
+                Icons.public, 'Quốc gia', resume!['country']?.toString()),
             _buildInfoRow(Icons.email, 'Email', resume!['email']),
             _buildInfoRow(
-                Icons.email_outlined,
-                lang('company_email', 'Email công ty'),
-                resume!['companyEmail']),
-            _buildInfoRow(Icons.phone, lang('phone', 'Di động cá nhân'),
-                (resume!['mobileNumber'])),
+                Icons.email_outlined, 'Email công ty', resume!['companyEmail']),
             _buildInfoRow(
-                Icons.phone,
-                lang('company_phone', 'Điện thoại công ty'),
-                (resume!['phoneNumber'])),
+                Icons.phone, 'Di động cá nhân', (resume!['mobileNumber'])),
             _buildInfoRow(
-                Icons.home,
-                lang('permanent_address', 'Địa chỉ thường trú'),
-                resume!['permanentAddress']),
+                Icons.phone, 'Điện thoại công ty', (resume!['phoneNumber'])),
             _buildInfoRow(
-                Icons.home_work,
-                lang('temporary_address', 'Địa chỉ tạm trú'),
+                Icons.home, 'Địa chỉ thường trú', resume!['permanentAddress']),
+            _buildInfoRow(Icons.home_work, 'Địa chỉ tạm trú',
                 resume!['temporaryAddress']),
-            _buildInfoRow(Icons.info, lang('status', 'Trạng thái'),
+            _buildInfoRow(Icons.info, 'Trạng thái',
                 _employeeStatusText(resume!['status']?.toString())),
-            _buildInfoRow(
-                Icons.calendar_today,
-                lang('vacation_day', 'Ngày phép còn lại'),
+            _buildInfoRow(Icons.calendar_today, 'Ngày phép còn lại',
                 resume!['vacationDay'].toString()),
           ]),
           const SizedBox(height: 20),
-          _logoutButton(), // 👉 luôn hiển thị logout
+          _logoutButton(),
         ],
       ),
     );
@@ -417,7 +397,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     if (loading) return const Center(child: CircularProgressIndicator());
     if (error != null) return Center(child: Text('Lỗi: $error'));
     if (profile == null) {
-      return Center(child: Text(lang('no_data', 'Không có dữ liệu')));
+      return Center(child: Text('Không có dữ liệu'));
     }
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -461,20 +441,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
             ),
           ),
           const SizedBox(height: 16),
-          _buildSection(lang('profile_info', 'Thông tin hồ sơ'), [
+          _buildSection('Thông tin hồ sơ', [
             _buildInfoRow(
               Icons.star,
-              lang('primary', 'Khoa chính'),
+              'Khoa chính',
               (profile!['primary']?.toString() == '1') ? 'Có' : 'Không',
             ),
-            _buildInfoRow(Icons.apartment, lang('department', 'Phòng ban'),
-                profile!['department']),
-            _buildInfoRow(
-                Icons.work, lang('position', 'Chức vụ'), profile!['position']),
-            _buildInfoRow(Icons.business, lang('branch', 'Chi nhánh'),
-                profile!['branch']),
-            _buildInfoRow(
-                Icons.layers, lang('block', 'Khối'), profile!['block']),
+            _buildInfoRow(Icons.apartment, 'Phòng ban', profile!['department']),
+            _buildInfoRow(Icons.work, 'Chức vụ', profile!['position']),
+            _buildInfoRow(Icons.business, 'Chi nhánh', profile!['branch']),
+            _buildInfoRow(Icons.layers, 'Khối', profile!['block']),
           ]),
         ],
       ),
@@ -486,7 +462,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     if (loading) return const Center(child: CircularProgressIndicator());
     if (error != null) return Center(child: Text('Lỗi: $error'));
     if (config == null) {
-      return Center(child: Text(lang('no_data', 'Không có dữ liệu')));
+      return Center(child: Text('Không có dữ liệu'));
     }
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -530,29 +506,25 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
             ),
           ),
           const SizedBox(height: 16),
-          _buildSection(lang('work_config', 'Cấu hình tính lương nhân viên'), [
-            _buildInfoRow(Icons.fastfood, lang('meal_support', 'Hỗ trợ bữa ăn'),
+          _buildSection('Cấu hình tính lương nhân viên', [
+            _buildInfoRow(Icons.fastfood, 'Hỗ trợ bữa ăn',
                 _MealSupport(config!['mealSupport']?.toString())),
-            _buildInfoRow(Icons.groups, lang('phi_cong_doan', 'Phí công đoàn'),
+            _buildInfoRow(Icons.groups, 'Phí công đoàn',
                 _Phicongdoan(config!['phiCongDoan']?.toString())),
-            _buildInfoRow(Icons.security, lang('bhtn', 'BHTN'),
-                _BHTN(config!['bhtn']?.toString())),
             _buildInfoRow(
-                Icons.calendar_today,
-                lang('on_saturday', 'Làm việc thứ 7'),
+                Icons.security, 'BHTN', _BHTN(config!['bhtn']?.toString())),
+            _buildInfoRow(Icons.calendar_today, 'Làm việc thứ 7',
                 _OnSaturdaySunday(config!['onSaturday']?.toString())),
-            _buildInfoRow(
-                Icons.calendar_today,
-                lang('on_sunday', 'Làm việc chủ nhật'),
+            _buildInfoRow(Icons.calendar_today, 'Làm việc chủ nhật',
                 _OnSaturdaySunday(config!['onSunday']?.toString())),
             _buildInfoRow(
               Icons.access_time,
-              lang('morning', 'Buổi sáng'),
+              'Buổi sáng',
               "${config!['morningIn']} đến ${config!['morningOut']}",
             ),
-            _buildInfoRow(Icons.access_time, lang('afternoon', 'Buổi chiều'),
+            _buildInfoRow(Icons.access_time, 'Buổi chiều',
                 "${config!['afternoonIn']} đến ${config!['afternoonOut']}"),
-            _buildInfoRow(Icons.work, lang('work_hours', 'Giờ làm việc'),
+            _buildInfoRow(Icons.work, 'Giờ làm việc',
                 "${config!['workHours']} giờ / ngày"),
           ]),
         ],

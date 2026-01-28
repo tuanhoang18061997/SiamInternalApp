@@ -6,9 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '/presentation/providers/auth_provider.dart';
 import '/presentation/providers/theme_provider.dart';
-import 'dart:io';
 import 'package:path_provider/path_provider.dart';
-import 'package:open_file/open_file.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '/presentation/utils/language.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -82,8 +80,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   List<LeaveRequest> _managedLetters = [];
   bool _initialLoading = true;
   String? _error;
-  String _searchQuery = '';
-  bool _showSearch = false;
+  String _searchQueryMyLetters = '';
+  String _searchQueryManaged = '';
+  bool _showSearchMyLetters = false;
+  bool _showSearchManaged = false;
   String? _displayName;
   late final TabController _tabController;
   late final ScrollController _scrollController;
@@ -202,11 +202,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   String _getTitle() {
     switch (_currentIndex) {
       case 0:
-        return lang('title_my_letters', 'Đơn của tôi');
+        return 'Đơn của tôi';
       case 1:
-        return lang('title_managed_letters', 'Đơn quản lý');
+        return 'Đơn quản lý';
       default:
-        return lang('title_list', 'Danh sách đơn');
+        return 'Danh sách đơn';
     }
   }
 
@@ -229,7 +229,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
       case 'Profile':
         final result = await context.push('/profile');
-        // Khi quay về từ Profile, reset về tab "Đơn của tôi"
         setState(() {
           _currentIndex = 0;
         });
@@ -245,7 +244,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.add),
-          tooltip: lang('create_new', 'Tạo đơn mới'),
+          tooltip: 'Tạo đơn mới',
           onPressed: () async {
             final result = await context.push('/create-leave-request');
             if (result == true) {
@@ -262,42 +261,57 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           ),
         ),
         actions: [
-          IconButton(
-            icon: Icon(_showSearch ? Icons.close : Icons.search),
-            onPressed: () {
-              setState(() {
-                _showSearch = !_showSearch;
-                if (!_showSearch) {
-                  _searchQuery = '';
-                }
-              });
-            },
-          ),
+          if (_currentIndex == 0) // Đơn cá nhân
+            IconButton(
+              icon: Icon(_showSearchMyLetters ? Icons.close : Icons.search),
+              onPressed: () {
+                setState(() {
+                  _showSearchMyLetters = !_showSearchMyLetters;
+                  if (!_showSearchMyLetters) _searchQueryMyLetters = '';
+                });
+              },
+            ),
+          if (_currentIndex == 1) // Đơn quản lý
+            IconButton(
+              icon: Icon(_showSearchManaged ? Icons.close : Icons.search),
+              onPressed: () {
+                setState(() {
+                  _showSearchManaged = !_showSearchManaged;
+                  if (!_showSearchManaged) _searchQueryManaged = '';
+                });
+              },
+            ),
         ],
       ),
       body: Column(
         children: [
-          if (_showSearch)
+          if (_currentIndex == 0 && _showSearchMyLetters)
             Padding(
               padding: const EdgeInsets.all(8.0),
               child: TextField(
-                autofocus: true,
                 decoration: InputDecoration(
                   prefixIcon: const Icon(Icons.search),
-                  hintText: lang(
-                      'search_hint', 'Tìm theo tên, lý do hoặc loại nghỉ...'),
-                  border: const OutlineInputBorder(),
+                  hintText: 'Tìm đơn cá nhân...',
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(20)),
                 ),
                 onChanged: (value) {
-                  setState(() {
-                    _searchQuery = value;
-                  });
+                  setState(() => _searchQueryMyLetters = value);
                 },
-                onSubmitted: (value) {
-                  setState(() {
-                    _searchQuery = value;
-                    _showSearch = false;
-                  });
+              ),
+            ),
+          if (_currentIndex == 1 && _showSearchManaged)
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: TextField(
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.search),
+                  hintText: 'Tìm đơn quản lý...',
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(20)),
+                ),
+                onChanged: (value) {
+                  setState(() => _searchQueryManaged = value);
                 },
               ),
             ),
@@ -310,8 +324,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 _initialLoading
                     ? const Center(child: CircularProgressIndicator())
                     : _error != null
-                        ? Center(
-                            child: Text('${lang('error', 'Lỗi')}: $_error'))
+                        ? Center(child: Text('${'Lỗi'}: $_error'))
                         : _buildStatusTabs(_myLetters),
 
                 // Trang 1: Đơn quản lý (chỉ hiển thị nếu có quyền)
@@ -345,9 +358,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Widget _buildManagedLetters() {
-    final pending = _managedLetters.where((r) => r.statusId == 2).toList();
-    final approved = _managedLetters.where((r) => r.statusId == 3).toList();
-    final rejected = _managedLetters.where((r) => r.statusId == 4).toList();
+    final filtered = _searchQueryManaged.isEmpty
+        ? _managedLetters
+        : _managedLetters.where((r) {
+            final q = _searchQueryManaged.toLowerCase();
+            return r.employeeName.toLowerCase().contains(q) ||
+                r.reason.toLowerCase().contains(q) ||
+                r.leaveType.toLowerCase().contains(q);
+          }).toList();
+
+    final pending = filtered.where((r) => r.statusId == 2).toList();
+    final approved = filtered.where((r) => r.statusId == 3).toList();
+    final rejected = filtered.where((r) => r.statusId == 4).toList();
 
     return DefaultTabController(
       length: 3,
@@ -375,10 +397,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Widget _buildStatusTabs(List<LeaveRequest> requests) {
-    final filtered = _searchQuery.isEmpty
+    final filtered = _searchQueryMyLetters.isEmpty
         ? requests
         : requests.where((r) {
-            final q = _searchQuery.toLowerCase();
+            final q = _searchQueryMyLetters.toLowerCase();
             return r.employeeName.toLowerCase().contains(q) ||
                 r.reason.toLowerCase().contains(q) ||
                 r.leaveType.toLowerCase().contains(q);
@@ -395,10 +417,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         children: [
           TabBar(
             tabs: [
-              Tab(text: lang('status_draft', 'Đơn nháp')),
-              Tab(text: lang('status_pending', 'Đang chờ duyệt')),
-              Tab(text: lang('status_approved', 'Đã duyệt')),
-              Tab(text: lang('status_rejected', 'Không duyệt')),
+              Tab(text: 'Đơn nháp'),
+              Tab(text: 'Đang chờ duyệt'),
+              Tab(text: 'Đã duyệt'),
+              Tab(text: 'Không duyệt'),
             ],
           ),
           Expanded(
@@ -418,7 +440,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   Widget _buildList(List<LeaveRequest> requests) {
     return requests.isEmpty
-        ? Center(child: Text(lang('no_data', 'Không có dữ liệu')))
+        ? Center(child: Text('Không có dữ liệu'))
         : ListView.builder(
             padding: const EdgeInsets.all(12),
             controller: _scrollController,
