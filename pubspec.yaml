@@ -9,6 +9,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  shared_preferences: ^2.2.2
   flutter_riverpod: 2.5.1
   riverpod: 2.5.1
   go_router: ^17.0.0
@@ -23,6 +24,8 @@ dependencies:
   fluttertoast: ^9.0.0
   json_annotation: ^4.9.0
   state_notifier: 1.0.0
+  path_provider: ^2.0.15
+  open_file: ^3.2.1
 
 dev_dependencies:
   flutter_test:
@@ -33,4 +36,6 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - .env
+    - assets/.env
+    - assets/.env.android
+    - assets/.env.web

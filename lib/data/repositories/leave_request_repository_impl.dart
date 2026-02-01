@@ -1,62 +1,19 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/entities/leave_request.dart';
 import '../../domain/repositories/leave_request_repository.dart';
-import '../datasources/mock_api_datasource.dart';
+import '../datasources/leave_request_remote_datasource.dart';
 
 class LeaveRequestRepositoryImpl implements LeaveRequestRepository {
-  final MockApiDataSource _dataSource;
-
-  LeaveRequestRepositoryImpl(this._dataSource);
+  LeaveRequestRepositoryImpl(this.remoteDataSource, this.token);
+  final LeaveRequestRemoteDataSource remoteDataSource;
+  final String token;
 
   @override
-  Future<List<LeaveRequest>> getLeaveRequests() async {
-    final models = await _dataSource.getLeaveRequests();
-    return models.map((model) => model.toEntity()).toList();
+  Future<List<LeaveRequest>> getLetters() {
+    return remoteDataSource.getLetters(token);
   }
 
   @override
-  Future<LeaveRequest> getLeaveRequestById(String id) async {
-    final model = await _dataSource.getLeaveRequestById(id);
-    return model.toEntity();
-  }
-
-  @override
-  Future<LeaveRequest> createLeaveRequest({
-    required String employeeId,
-    required String employeeName,
-    required String leaveType,
-    required DateTime startDate,
-    required DateTime endDate,
-    required String reason,
-  }) async {
-    final model = await _dataSource.createLeaveRequest(
-      employeeId: employeeId,
-      employeeName: employeeName,
-      leaveType: leaveType,
-      startDate: startDate,
-      endDate: endDate,
-      reason: reason,
-    );
-    return model.toEntity();
-  }
-
-  @override
-  Future<LeaveRequest> approveLeaveRequest(String id, String approvedBy) async {
-    final model = await _dataSource.approveLeaveRequest(id, approvedBy);
-    return model.toEntity();
-  }
-
-  @override
-  Future<LeaveRequest> rejectLeaveRequest(
-    String id,
-    String rejectedBy,
-    String reason,
-  ) async {
-    final model = await _dataSource.rejectLeaveRequest(id, rejectedBy, reason);
-    return model.toEntity();
+  Future<LeaveRequest> getLetterById(int id) {
+    throw UnimplementedError(); // bạn có thể thêm sau
   }
 }
-
-final leaveRequestRepositoryProvider = Provider<LeaveRequestRepository>((ref) {
-  return LeaveRequestRepositoryImpl(ref.watch(mockApiDataSourceProvider));
-});

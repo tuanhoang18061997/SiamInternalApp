@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/auth_provider.dart';
+import '../../domain/entities/login_response.dart';
+import '/presentation/providers/theme_provider.dart';
+import '/presentation/utils/language.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -12,13 +16,13 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
+  final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _usernameController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -26,39 +30,94 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() => _isLoading = true);
+    if (mounted) {
+      setState(() => _isLoading = true);
+    }
 
-    try {
-      await ref.read(authProvider.notifier).login(
-            _emailController.text,
-            _passwordController.text,
-          );
-
-      if (mounted) {
-        final user = ref.read(currentUserProvider);
-        if (user != null) {
-          context.go('/home');
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Login failed: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
+    await ref.read(authProvider.notifier).login(
+          _usernameController.text,
+          _passwordController.text,
         );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+
+    if (mounted) {
+      setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<AsyncValue<LoginResponse?>>(authProvider,
+        (previous, next) async {
+      if (!mounted) return;
+
+      if (next.hasError) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(next.error.toString()),
+            backgroundColor: Colors.red,
+          ),
+        );
+      } else if (next.value != null) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.reload();
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${'Đăng nhập thành công'} :  ${next.value!.displayName}',
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        context.go('/home');
+      }
+    });
+
     return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          'Đăng nhập tài khoản',
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.5,
+            shadows: [
+              Shadow(
+                blurRadius: 4.0,
+                color: Colors.black45,
+                offset: Offset(2.0, 2.0),
+              ),
+            ],
+          ),
+        ),
+        /*actions: [
+          IconButton(
+            icon: const Icon(Icons.language),
+            tooltip: 'Language',
+            onPressed: () {
+              setState(() {
+                currentLanguage = currentLanguage == "vi" ? "en" : "vi";
+              });
+            },
+          ),
+          Consumer(
+            builder: (context, ref, _) {
+              final mode = ref.watch(themeModeProvider);
+              return IconButton(
+                icon: Icon(
+                  mode == ThemeMode.dark ? Icons.light_mode : Icons.dark_mode,
+                ),
+                onPressed: () {
+                  final notifier = ref.read(themeModeProvider.notifier);
+                  notifier.state =
+                      mode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
+                },
+              );
+            },
+          ),
+        ],*/
+      ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -77,9 +136,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   const SizedBox(height: 24),
                   Text(
                     'Siam Internal App',
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
+                    style: TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.5,
+                      shadows: [
+                        Shadow(
+                          blurRadius: 4.0,
+                          color: Colors.black45,
+                          offset: Offset(2.0, 2.0),
                         ),
+                      ],
+                    ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 8),
@@ -92,19 +160,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   const SizedBox(height: 48),
                   TextFormField(
-                    controller: _emailController,
-                    decoration: const InputDecoration(
-                      labelText: 'Email',
-                      prefixIcon: Icon(Icons.email),
+                    controller: _usernameController,
+                    decoration: InputDecoration(
+                      labelText: 'Tên tài khoản',
+                      prefixIcon: Icon(Icons.person),
                       border: OutlineInputBorder(),
                     ),
-                    keyboardType: TextInputType.emailAddress,
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Please enter your email';
-                      }
-                      if (!value.contains('@')) {
-                        return 'Please enter a valid email';
+                        return 'Vui lòng điền tên tài khoản';
                       }
                       return null;
                     },
@@ -112,15 +176,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _passwordController,
-                    decoration: const InputDecoration(
-                      labelText: 'Password',
+                    decoration: InputDecoration(
+                      labelText: 'Mật khẩu',
                       prefixIcon: Icon(Icons.lock),
                       border: OutlineInputBorder(),
                     ),
                     obscureText: true,
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Please enter your password';
+                        return 'Vui lòng điền mật khẩu';
                       }
                       return null;
                     },
@@ -137,37 +201,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             width: 20,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Text('Login'),
-                  ),
-                  const SizedBox(height: 24),
-                  Card(
-                    color: Colors.blue[50],
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Demo Credentials',
-                            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                          ),
-                          const SizedBox(height: 8),
-                          const Text('Manager:'),
-                          const Text(
-                            'Email: admin@siam.com\nPassword: any',
-                            style: TextStyle(fontSize: 12),
-                          ),
-                          const SizedBox(height: 8),
-                          const Text('Employee:'),
-                          const Text(
-                            'Email: employee@siam.com\nPassword: any',
-                            style: TextStyle(fontSize: 12),
-                          ),
-                        ],
-                      ),
-                    ),
+                        : Text('Đăng nhập'),
                   ),
                 ],
               ),

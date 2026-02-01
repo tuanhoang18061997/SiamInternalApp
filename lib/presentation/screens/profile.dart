@@ -1,0 +1,563 @@
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:siam_internal_app/presentation/utils/language.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../../presentation/providers/auth_provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+class ProfileScreen extends ConsumerStatefulWidget {
+  const ProfileScreen({super.key});
+
+  @override
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends ConsumerState<ProfileScreen>
+    with SingleTickerProviderStateMixin {
+  Map<String, dynamic>? resume;
+  Map<String, dynamic>? profile;
+  Map<String, dynamic>? config;
+  bool loading = true;
+  String? error;
+  late TabController _tabController;
+
+  final baseUrl = dotenv.env['API_BASE_URL'];
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 3, vsync: this, initialIndex: 0);
+    _loadProfile();
+    _loadResume();
+    _loadConfig();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadConfig() async {
+    try {
+      final token = ref.read(authProvider).value?.token;
+      if (token == null) {
+        setState(() => error = 'No token found');
+        return;
+      }
+
+      final uri = Uri.parse('$baseUrl/api/Profile/config');
+      final res =
+          await http.get(uri, headers: {'Authorization': 'Bearer $token'});
+      if (res.statusCode == 200) {
+        setState(() => config = jsonDecode(res.body));
+      } else {
+        setState(() => error = 'Failed: ${res.statusCode}');
+      }
+    } catch (e) {
+      setState(() => error = e.toString());
+    }
+  }
+
+  Future<void> _loadProfile() async {
+    try {
+      final token = ref.read(authProvider).value?.token;
+      if (token == null) {
+        setState(() => error = 'No token found');
+        return;
+      }
+
+      // Gọi API Profile/profile
+      final uri = Uri.parse('$baseUrl/api/Profile/profile');
+
+      final res =
+          await http.get(uri, headers: {'Authorization': 'Bearer $token'});
+      if (res.statusCode == 200) {
+        setState(() => profile = jsonDecode(res.body));
+      } else {
+        setState(() => error = 'Failed: ${res.statusCode}');
+      }
+    } catch (e) {
+      setState(() => error = e.toString());
+    }
+  }
+
+  Future<void> _loadResume() async {
+    setState(() {
+      loading = true;
+      error = null;
+    });
+    try {
+      final token = ref.read(authProvider).value?.token;
+      if (token == null) {
+        setState(() => error = 'No token found');
+        return;
+      }
+
+      // Gọi API Profile/resume
+      final uri = Uri.parse('$baseUrl/api/Profile/resume');
+      final res =
+          await http.get(uri, headers: {'Authorization': 'Bearer $token'});
+      if (res.statusCode == 200) {
+        setState(() => resume = jsonDecode(res.body));
+      } else {
+        setState(() => error = 'Failed: ${res.statusCode}');
+      }
+    } catch (e) {
+      setState(() => error = e.toString());
+    } finally {
+      setState(() => loading = false);
+    }
+  }
+
+  String _formatDate(String? dateStr) {
+    if (dateStr == null || dateStr.isEmpty) return '';
+    final dt = DateTime.tryParse(dateStr);
+    if (dt == null) return dateStr;
+    return '${dt.day}/${dt.month}/${dt.year}';
+  }
+
+  String _genderText(dynamic gender) {
+    if (gender == null) return '';
+    if (gender.toString() == '1') return 'Nam';
+    if (gender.toString() == '2') return 'Nữ';
+    return '';
+  }
+
+  String _OnSaturdaySunday(dynamic status) {
+    switch (status?.toString()) {
+      case '0':
+        return 'Nghỉ';
+      case '1':
+        return 'Buổi sáng';
+      case '2':
+        return 'Cả ngày';
+      default:
+        return '';
+    }
+  }
+
+  String _Phicongdoan(dynamic status) {
+    switch (status?.toString()) {
+      case '0':
+        return 'Chưa cấu hình';
+      case '1':
+        return 'Không đóng';
+      case '2':
+        return 'Có đóng';
+      default:
+        return '';
+    }
+  }
+
+  String _BHTN(dynamic status) {
+    switch (status?.toString()) {
+      case '0':
+        return 'Chưa cấu hình';
+      case '1':
+        return 'Không đóng';
+      case '2':
+        return 'Có đóng';
+      default:
+        return '';
+    }
+  }
+
+  String _MealSupport(dynamic status) {
+    switch (status?.toString()) {
+      case '0':
+        return 'Chưa cấu hình';
+      case '1':
+        return 'Không hỗ trợ';
+      case '2':
+        return 'Hỗ trợ';
+      default:
+        return '';
+    }
+  }
+
+  String _maritalStatusText(dynamic status) {
+    switch (status?.toString()) {
+      case '1':
+        return 'Đã kết hôn';
+      case '2':
+        return 'Độc thân';
+      case '3':
+        return 'Ly hôn';
+      case '4':
+        return 'Ở góa';
+      default:
+        return '';
+    }
+  }
+
+  String _employeeStatusText(dynamic status) {
+    switch (status?.toString()) {
+      case '1':
+        return 'Thử việc';
+      case '2':
+        return 'Nhân viên chính thức';
+      case '3':
+        return 'Thôi việc';
+      case '4':
+        return 'Hợp tác';
+      case '5':
+        return 'Học Nghề - Học Việc';
+      case '6':
+        return 'Tư vấn';
+      default:
+        return '';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DefaultTabController(
+      length: 3,
+      child: Scaffold(
+        body: NestedScrollView(
+          headerSliverBuilder: (context, innerBoxIsScrolled) => [
+            SliverAppBar(
+              floating: true,
+              snap: true,
+              pinned: false,
+              bottom: TabBar(
+                tabs: [
+                  Tab(
+                      icon: const Icon(Icons.assignment),
+                      text: 'Sơ yếu lý lịch'),
+                  Tab(icon: const Icon(Icons.person), text: 'Hồ sơ'),
+                  Tab(icon: const Icon(Icons.settings), text: 'Cấu hình'),
+                ],
+              ),
+            ),
+          ],
+          body: TabBarView(
+            children: [
+              _buildResumeTab(),
+              _buildProfileTab(),
+              _buildConfigTab(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Tab 1: Sơ yếu lý lịch
+  Widget _logoutButton() {
+    return SizedBox(
+      width: double.infinity,
+      child: Consumer(
+        builder: (context, ref, _) {
+          return ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              elevation: 6,
+            ),
+            icon: const Icon(Icons.logout, color: Colors.white, size: 28),
+            label: const Text(
+              'Logout',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+            onPressed: () async {
+              await ref.read(authProvider.notifier).logout();
+              if (!mounted) return;
+              context.go('/');
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildResumeTab() {
+    if (loading) return const Center(child: CircularProgressIndicator());
+
+    if (error != null) {
+      return SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Text('Lỗi: $error'),
+            const SizedBox(height: 20),
+            _logoutButton(),
+          ],
+        ),
+      );
+    }
+
+    if (resume == null) {
+      return SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Text('Không có dữ liệu'),
+            const SizedBox(height: 20),
+            _logoutButton(),
+          ],
+        ),
+      );
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          Card(
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            elevation: 3,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 50,
+                    backgroundColor: Colors.blue.shade200,
+                    child:
+                        const Icon(Icons.person, size: 50, color: Colors.white),
+                  ),
+                  const SizedBox(width: 20),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          resume!['name'] ?? '',
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          resume!['code'] ?? '',
+                          style: TextStyle(color: Colors.grey.shade600),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          _buildSection('Thông tin cá nhân', [
+            _buildInfoRow(Icons.badge, 'Mã chấm công',
+                resume!['attendanceCode']?.toString()),
+            _buildInfoRow(
+                Icons.transgender, 'Giới tính', _genderText(resume!['gender'])),
+            _buildInfoRow(
+                Icons.cake, 'Ngày sinh', _formatDate(resume!['dateOfBirth'])),
+            _buildInfoRow(Icons.people, 'Tình trạng hôn nhân',
+                _maritalStatusText(resume!['maritalStatus']?.toString())),
+            _buildInfoRow(Icons.flag, 'Dân tộc', resume!['ethnic']?.toString()),
+            _buildInfoRow(
+                Icons.church, 'Tôn giáo', resume!['religon']?.toString()),
+            _buildInfoRow(Icons.location_city, 'Nơi sinh',
+                resume!['placeOfBirth']?.toString()),
+            _buildInfoRow(
+                Icons.public, 'Quốc gia', resume!['country']?.toString()),
+            _buildInfoRow(Icons.email, 'Email', resume!['email']),
+            _buildInfoRow(
+                Icons.email_outlined, 'Email công ty', resume!['companyEmail']),
+            _buildInfoRow(
+                Icons.phone, 'Di động cá nhân', (resume!['mobileNumber'])),
+            _buildInfoRow(
+                Icons.phone, 'Điện thoại công ty', (resume!['phoneNumber'])),
+            _buildInfoRow(
+                Icons.home, 'Địa chỉ thường trú', resume!['permanentAddress']),
+            _buildInfoRow(Icons.home_work, 'Địa chỉ tạm trú',
+                resume!['temporaryAddress']),
+            _buildInfoRow(Icons.info, 'Trạng thái',
+                _employeeStatusText(resume!['status']?.toString())),
+            _buildInfoRow(Icons.calendar_today, 'Ngày phép còn lại',
+                resume!['vacationDay'].toString()),
+          ]),
+          const SizedBox(height: 20),
+          _logoutButton(),
+        ],
+      ),
+    );
+  }
+
+  /// Tab 2: Hồ sơ
+  Widget _buildProfileTab() {
+    if (loading) return const Center(child: CircularProgressIndicator());
+    if (error != null) return Center(child: Text('Lỗi: $error'));
+    if (profile == null) {
+      return Center(child: Text('Không có dữ liệu'));
+    }
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          Card(
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            elevation: 3,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 50,
+                    backgroundColor: Colors.blue.shade200,
+                    child:
+                        const Icon(Icons.person, size: 50, color: Colors.white),
+                  ),
+                  const SizedBox(width: 20),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          resume!['name'] ?? '',
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          resume!['code'] ?? '',
+                          style: TextStyle(color: Colors.grey.shade600),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          _buildSection('Thông tin hồ sơ', [
+            _buildInfoRow(
+              Icons.star,
+              'Khoa chính',
+              (profile!['primary']?.toString() == '1') ? 'Có' : 'Không',
+            ),
+            _buildInfoRow(Icons.apartment, 'Phòng ban', profile!['department']),
+            _buildInfoRow(Icons.work, 'Chức vụ', profile!['position']),
+            _buildInfoRow(Icons.business, 'Chi nhánh', profile!['branch']),
+            _buildInfoRow(Icons.layers, 'Khối', profile!['block']),
+          ]),
+        ],
+      ),
+    );
+  }
+
+  /// Tab 3: Cấu hình
+  Widget _buildConfigTab() {
+    if (loading) return const Center(child: CircularProgressIndicator());
+    if (error != null) return Center(child: Text('Lỗi: $error'));
+    if (config == null) {
+      return Center(child: Text('Không có dữ liệu'));
+    }
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          Card(
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            elevation: 3,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 50,
+                    backgroundColor: Colors.blue.shade200,
+                    child:
+                        const Icon(Icons.person, size: 50, color: Colors.white),
+                  ),
+                  const SizedBox(width: 20),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          resume!['name'] ?? '',
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          resume!['code'] ?? '',
+                          style: TextStyle(color: Colors.grey.shade600),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          _buildSection('Cấu hình tính lương nhân viên', [
+            _buildInfoRow(Icons.fastfood, 'Hỗ trợ bữa ăn',
+                _MealSupport(config!['mealSupport']?.toString())),
+            _buildInfoRow(Icons.groups, 'Phí công đoàn',
+                _Phicongdoan(config!['phiCongDoan']?.toString())),
+            _buildInfoRow(
+                Icons.security, 'BHTN', _BHTN(config!['bhtn']?.toString())),
+            _buildInfoRow(Icons.calendar_today, 'Làm việc thứ 7',
+                _OnSaturdaySunday(config!['onSaturday']?.toString())),
+            _buildInfoRow(Icons.calendar_today, 'Làm việc chủ nhật',
+                _OnSaturdaySunday(config!['onSunday']?.toString())),
+            _buildInfoRow(
+              Icons.access_time,
+              'Buổi sáng',
+              "${config!['morningIn']} đến ${config!['morningOut']}",
+            ),
+            _buildInfoRow(Icons.access_time, 'Buổi chiều',
+                "${config!['afternoonIn']} đến ${config!['afternoonOut']}"),
+            _buildInfoRow(Icons.work, 'Giờ làm việc',
+                "${config!['workHours']} giờ / ngày"),
+          ]),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSection(String title, List<Widget> children) {
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title,
+                style:
+                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Divider(),
+            ...children,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String label, String? value) {
+    return ListTile(
+      dense: true,
+      leading: Icon(icon, color: Colors.blue),
+      title: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+      subtitle: Text(value ?? ''),
+    );
+  }
+}
